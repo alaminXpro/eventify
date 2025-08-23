@@ -27,7 +27,14 @@ const envVarsSchema = Joi.object()
     EMAIL_FROM: Joi.string().description('the from field in the emails sent by the app'),
     GOOGLE_CLIENT_ID: Joi.string().description('Google OAuth Client ID'),
     GOOGLE_CLIENT_SECRET: Joi.string().description('Google OAuth Client Secret'),
-    GOOGLE_CALLBACK_URL: Joi.string().description('Google OAuth Callback URL')
+    GOOGLE_CALLBACK_URL: Joi.string().description('Google OAuth Callback URL'),
+    OPENAI_API_KEY: Joi.string().description('OpenAI API Key'),
+    OPENAI_MODEL: Joi.string().description('OpenAI Model'),
+    LLM_TIMEOUT_MS: Joi.number().description('LLM Timeout in milliseconds'),
+    STRICT_CONTEXT_ONLY: Joi.boolean().description('Strict Context Only'),
+    MAX_OUTPUT_TOKENS: Joi.number().description('Maximum Output Tokens'),
+    CONTEXT_FILE: Joi.string().description('Context File'),
+    CACHE_MAX: Joi.number().description('Cache Max'),
   })
   .unknown();
 
@@ -72,5 +79,13 @@ module.exports = {
     clientId: envVars.GOOGLE_CLIENT_ID,
     clientSecret: envVars.GOOGLE_CLIENT_SECRET,
     callbackUrl: envVars.GOOGLE_CALLBACK_URL,
-  }
+  },
+  openai: {
+    apiKey: envVars.OPENAI_API_KEY,
+    model: envVars.OPENAI_MODEL,
+    timeoutMs: envVars.LLM_TIMEOUT_MS,
+    strictContextOnly: envVars.STRICT_CONTEXT_ONLY,
+    maxOutputTokens: envVars.MAX_OUTPUT_TOKENS,
+    contextFile: envVars.CONTEXT_FILE,
+  },
 };
