@@ -49,29 +49,26 @@ const userSchema = mongoose.Schema(
       default: false,
     },
     preferences: {
-      type: {
-        preferredEventCategory: {
-          type: [String],
-          enum: ['Tech', 'Business', 'Design', 'Marketing', 'Finance', 'Law', 'Health', 'Education', 'Other'],
-          default: [],
-        },
-        preferredEventFormat: {
-          type: [String],
-          enum: ['Online', 'Offline', 'Hybrid', 'Workshop', 'Seminar', 'Conference', 'Hackathon', 'Meetup', 'Other'],
-          default: [],
-        },
-        eventGroupSize: {
-          type: [String],
-          enum: ['Small (1-10)', 'Medium (11-50)', 'Large (51-100)', 'Very Large (100+)'],
-          default: [],
-        },
-        eventPopularity: {
-          type: [String],
-          enum: ['Low', 'Medium', 'High', 'Very High'],
-          default: [],
-        },
+      preferredEventCategory: {
+        type: [String],
+        enum: ['Tech', 'Business', 'Design', 'Marketing', 'Finance', 'Law', 'Health', 'Education', 'Other'],
+        default: [],
       },
-      default: {},
+      preferredEventFormat: {
+        type: [String],
+        enum: ['Online', 'Offline', 'Hybrid', 'Workshop', 'Seminar', 'Conference', 'Hackathon', 'Meetup', 'Other'],
+        default: [],
+      },
+      eventGroupSize: {
+        type: [String],
+        enum: ['Small (1-10)', 'Medium (11-50)', 'Large (51-100)', 'Very Large (100+)'],
+        default: [],
+      },
+      eventPopularity: {
+        type: [String],
+        enum: ['Low', 'Medium', 'High', 'Very High'],
+        default: [],
+      },
     },
     // New fields
     department: {
