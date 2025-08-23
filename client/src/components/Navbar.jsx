@@ -175,7 +175,7 @@ export default function Navbar() {
               href="/profile"
               className="px-3 py-2 rounded-md text-gray-200 hover:text-white hover:bg-white/10 transition"
             >
-              Profile
+              Profile Page
             </a>
           </li>
         </ul>
