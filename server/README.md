@@ -1,0 +1,2 @@
+## Eventify Server
+Hello world!
