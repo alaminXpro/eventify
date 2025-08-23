@@ -245,7 +245,7 @@ const Events = () => {
 
           {/* Desktop Create button (quick access) */}
           <Link
-            to="/events/new"
+            to="/events/create"
             className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
           >
             <PlusIcon className="h-4 w-4" />
@@ -300,14 +300,7 @@ const Events = () => {
                 <option value="capacity">Largest capacity</option>
               </select>
 
-              {/* Create button (visible on all sizes inside controls) */}
-              <Link
-                to="/events/new"
-                className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-600/90 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-600"
-              >
-                <PlusIcon className="h-4 w-4" />
-                New
-              </Link>
+              
             </div>
           </div>
         </div>
@@ -323,7 +316,7 @@ const Events = () => {
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
             <Link
-              to="/events/new"
+              to="/events/create"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               <PlusIcon className="h-4 w-4" />
