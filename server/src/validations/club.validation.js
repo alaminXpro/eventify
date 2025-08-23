@@ -7,9 +7,6 @@ const createClub = {
     description: Joi.string().required(),
     logo: Joi.string().required(),
     website: Joi.string().required(),
-    moderators: Joi.array().items(Joi.string().custom(objectId)),
-    members: Joi.array().items(Joi.string().custom(objectId)),
-    pendings: Joi.array().items(Joi.string().custom(objectId)),
   }),
 };
 

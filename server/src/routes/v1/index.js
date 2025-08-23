@@ -1,7 +1,8 @@
 const express = require('express');
 const authRoute = require('./auth.route');
 const userRoute = require('./user.route');
-const clubRoute = require('./club.route')
+const clubRoute = require('./club.route');
+const eventRoute = require('./event.route');
 const docsRoute = require('./docs.route');
 const aiRoute = require('./ai.route');
 const config = require('../../config/config');
@@ -19,6 +20,10 @@ const defaultRoutes = [
   {
     path: '/clubs',
     route: clubRoute,
+  },
+  {
+    path: '/events',
+    route: eventRoute,
   },
   {
     path: '/ai',

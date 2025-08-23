@@ -14,6 +14,52 @@ const swaggerDef = {
       url: `http://localhost:${config.port}/v1`,
     },
   ],
+  components: {
+    schemas: {
+      Event: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          title: { type: 'string' },
+          event_description: { type: 'string' },
+          category: { type: 'string' },
+          event_image: { type: 'string' },
+          club_hosting: { $ref: '#/components/schemas/Club' },
+          event_status: { type: 'string' },
+          event_date: { type: 'string', format: 'date-time' },
+          event_time_duration: { type: 'string' },
+          registration_deadline: { type: 'string', format: 'date-time' },
+          location: { type: 'string' },
+          capacity: { type: 'integer' },
+          event_type: { type: 'string' },
+          total_registrations: { type: 'integer' },
+          unique_attendees: { type: 'integer' },
+          feedback_score: { type: 'number' },
+          view: { type: 'integer' },
+          skills_offered: { type: 'array', items: { type: 'string' } },
+          topics: { type: 'array', items: { type: 'string' } },
+          media_links: { type: 'array', items: { type: 'string' } },
+          created_at: { type: 'string', format: 'date-time' },
+          updated_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      Club: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          name: { type: 'string' },
+          description: { type: 'string' },
+          logo: { type: 'string' },
+          website: { type: 'string' },
+          moderators: { type: 'array', items: { type: 'string' } },
+          members: { type: 'array', items: { type: 'string' } },
+          pendings: { type: 'array', items: { type: 'string' } },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  },
 };
 
 module.exports = swaggerDef;
