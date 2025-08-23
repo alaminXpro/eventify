@@ -7,7 +7,6 @@ export default function EventifyLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [emailTouched, setEmailTouched] = useState(false);
 
   const navigate = useNavigate();
 
@@ -20,23 +19,20 @@ export default function EventifyLogin() {
     navigate('/signup');
   };
 
-  // ----- Email Validation -----
-  const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-
   // ----- Auth placeholders -----
   const handleGoogleLogin = () => {
     setIsLoading(true);
+    // BACKEND INTEGRATION POINT:
+    // Redirect to your backend OAuth route or trigger GIS / provider SDK.
+    // e.g. window.location.href = "/api/auth/google?redirect=/dashboard";
     console.log('Google login clicked - integrate with your OAuth provider');
     setTimeout(() => setIsLoading(false), 2000);
   };
 
   const handleLogin = () => {
-    if (!isValidEmail(email)) {
-      setEmailTouched(true); // show error if invalid
-      return;
-    }
-
     setIsLoading(true);
+    // BACKEND INTEGRATION POINT:
+    // Call your auth API: signInWithEmailAndPassword / fetch('/api/auth/login') etc.
     console.log('Login attempt:', { email, password });
     setTimeout(() => setIsLoading(false), 2000);
   };
@@ -181,17 +177,11 @@ export default function EventifyLogin() {
               <input
                 type="email"
                 value={email}
-                onBlur={() => setEmailTouched(true)}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-gray-900 placeholder-gray-500 
-                  focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300
-                  ${emailTouched && !isValidEmail(email) ? 'border-red-500' : 'border-gray-200'}`}
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
                 placeholder="Enter your email"
                 required
               />
-              {emailTouched && !isValidEmail(email) && (
-                <p className="text-sm text-red-500">Enter a valid email address</p>
-              )}
             </div>
 
             {/* Password Input */}
