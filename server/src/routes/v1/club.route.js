@@ -15,7 +15,7 @@ router
   .route('/:clubId')
   .get(auth('getClubs'), validate(clubValidation.getClub), clubController.getClub)
   .patch(auth('manageClubs'), validate(clubValidation.updateClub), clubController.updateClub)
-  .delete(auth('addClub'), validate(clubValidation.deleteClub), clubController.deleteClub)
+  .delete(auth('addClub'), validate(clubValidation.deleteClub), clubController.deleteClub);
 
 router
   .route('/:clubId/status')
@@ -208,6 +208,9 @@ module.exports = router;
  *       - in: path
  *         name: clubId
  *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
  *         name: userId
  *         required: true
  *         schema:
@@ -237,7 +240,6 @@ module.exports = router;
  *       - in: path
  *         name: clubId
  *         required: true
- *         
  *         schema:
  *           type: string
  *     responses:
@@ -318,7 +320,7 @@ module.exports = router;
 
 /**
  * @swagger
- * /clubs/{clubId/pendings}:
+ * /clubs/{clubId}/pendings:
  *   post:
  *     summary: Get pending club members
  *     tags: [Clubs]
