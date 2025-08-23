@@ -1,3 +1,4 @@
+// src/pages/Events.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
@@ -13,6 +14,12 @@ const CalendarIcon = (props) => (
 const LocationIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+  </svg>
+);
+/* Small Plus icon for buttons */
+const PlusIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
+    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
   </svg>
 );
 
@@ -34,7 +41,6 @@ const EventCard = ({ event, onRegister }) => {
       whileHover={{ y: -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 24, mass: 0.6 }}
     >
-      {/* sheen */}
       <span
         aria-hidden
         className="pointer-events-none absolute -inset-[1px] rounded-2xl opacity-0 blur-[2px] transition-opacity duration-300 group-hover:opacity-100"
@@ -55,7 +61,6 @@ const EventCard = ({ event, onRegister }) => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent" />
 
-        {/* category */}
         <div className="absolute left-3 top-3">
           <motion.span
             className={`rounded-md ${brandGrad} px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur`}
@@ -66,7 +71,6 @@ const EventCard = ({ event, onRegister }) => {
           </motion.span>
         </div>
 
-        {/* date pill */}
         <motion.div
           className="absolute right-3 top-3 rounded-lg bg-white/90 p-2 text-center shadow-sm backdrop-blur"
           whileHover={{ scale: 1.05 }}
@@ -93,7 +97,6 @@ const EventCard = ({ event, onRegister }) => {
           </div>
         </div>
 
-        {/* capacity */}
         <div className="mb-3">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">Spots</span>
@@ -109,7 +112,6 @@ const EventCard = ({ event, onRegister }) => {
           </div>
         </div>
 
-        {/* CTA */}
         <motion.button
           onClick={() => onRegister?.(event)}
           className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${
@@ -135,13 +137,11 @@ const Events = () => {
   const PAGE_SIZE = 12;
   const prefersReducedMotion = useReducedMotion();
 
-  // ---------- UI State ----------
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("upcoming");
   const [page, setPage] = useState(1);
 
-  // Data state
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -149,7 +149,6 @@ const Events = () => {
 
   const loadMoreRef = useRef(null);
 
-  // ---------- Demo seed (remove once wired) ----------
   const SEED = useMemo(
     () => [
       { id: 101, title: "Campus Hackathon 2025", image: "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=1200&auto=format&fit=crop&q=60", category: "Hackathon", date: "May 10, 2025", time: "9:00 AM", month: "MAY", day: "10", location: "Innovation Lab", maxCapacity: 300, registeredCount: 248, createdAt: "2025-03-15" },
@@ -164,11 +163,8 @@ const Events = () => {
     []
   );
 
-  // ---------- Load Events ----------
   useEffect(() => {
     setLoading(true);
-
-    // Demo: mock a longer list by duplicating SEED
     const simulated = [
       ...SEED,
       ...SEED.map((e, i) => ({ ...e, id: e.id * 100 + i, title: `${e.title} (Session ${i + 1})` })),
@@ -181,7 +177,6 @@ const Events = () => {
     return () => clearTimeout(t);
   }, []);
 
-  // ---------- Derived ----------
   const categories = useMemo(() => {
     const set = new Set(["All"]);
     events.forEach((e) => set.add(e.category));
@@ -208,7 +203,6 @@ const Events = () => {
   const visible = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = visible.length < filtered.length;
 
-  // ---------- Handlers ----------
   const onRegister = (event) => {
     console.log("Register clicked:", event.title);
     alert(`Pretend registered for: ${event.title}`);
@@ -223,7 +217,6 @@ const Events = () => {
     }, 300);
   };
 
-  // Infinite scroll via IntersectionObserver
   useEffect(() => {
     if (prefersReducedMotion) return;
     const node = loadMoreRef.current;
@@ -237,18 +230,27 @@ const Events = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, prefersReducedMotion]);
 
-  // ---------- Anim Variants ----------
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } } };
-  const item = { hidden: { opacity: 0, y: 12, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 220, damping: 18 } } };
+  const item = { hidden: { opacity: 0, y: 12, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 220, damping: 18} } };
 
-  // ---------- UI ----------
   return (
     <section className="relative min-h-screen bg-[#0b1220] py-12">
       <div className="mx-auto max-w-7xl px-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="inline-flex bg-gradient-to-r from-indigo-300 via-white to-violet-300 bg-clip-text text-3xl font-black text-transparent md:text-4xl">All Events</h1>
-          <p className="mt-2 text-slate-400">Search, filter and discover everything happening.</p>
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="inline-flex bg-gradient-to-r from-indigo-300 via-white to-violet-300 bg-clip-text text-3xl font-black text-transparent md:text-4xl">All Events</h1>
+            <p className="mt-2 text-slate-400">Search, filter and discover everything happening.</p>
+          </div>
+
+          {/* Desktop Create button (quick access) */}
+          <Link
+            to="/events/new"
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Create Event
+          </Link>
         </div>
 
         {/* Sticky Controls */}
@@ -283,19 +285,30 @@ const Events = () => {
               ))}
             </div>
 
-            {/* Sort */}
-            <label className="sr-only" htmlFor="sortBy">Sort events</label>
-            <select
-              id="sortBy"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
-            >
-              <option value="upcoming">Upcoming</option>
-              <option value="popular">Most popular</option>
-              <option value="newest">Newest</option>
-              <option value="capacity">Largest capacity</option>
-            </select>
+            {/* Sort + Create (secondary position) */}
+            <div className="flex items-center gap-2">
+              <label className="sr-only" htmlFor="sortBy">Sort events</label>
+              <select
+                id="sortBy"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
+              >
+                <option value="upcoming">Upcoming</option>
+                <option value="popular">Most popular</option>
+                <option value="newest">Newest</option>
+                <option value="capacity">Largest capacity</option>
+              </select>
+
+              {/* Create button (visible on all sizes inside controls) */}
+              <Link
+                to="/events/new"
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-600/90 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-600"
+              >
+                <PlusIcon className="h-4 w-4" />
+                New
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -309,6 +322,13 @@ const Events = () => {
         ) : filtered.length === 0 ? (
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
+            <Link
+              to="/events/new"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Create the first event
+            </Link>
           </div>
         ) : (
           <>
@@ -321,7 +341,6 @@ const Events = () => {
             >
               {visible.map((e) => (
                 <motion.div key={e.id} variants={prefersReducedMotion ? undefined : item}>
-                  {/* LINK TO DETAILS */}
                   <Link to={`/events/${e.id}`} state={{ event: e }} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:rounded-2xl">
                     <EventCard event={e} onRegister={onRegister} />
                   </Link>
@@ -329,7 +348,6 @@ const Events = () => {
               ))}
             </motion.div>
 
-            {/* Load more / sentinel */}
             {hasMore && (
               <div className="mt-10 flex justify-center">
                 <motion.button
@@ -347,6 +365,15 @@ const Events = () => {
           </>
         )}
       </div>
+
+      {/* Floating Create FAB for mobile */}
+      <Link
+        to="/events/new"
+        className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
+        aria-label="Create Event"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </Link>
 
       {/* page bg accents */}
       <div className="pointer-events-none absolute inset-0 -z-10">

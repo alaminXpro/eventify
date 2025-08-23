@@ -69,4 +69,4 @@ const SKILLS_ENUM = [
   "Community Building"
 ];
 
-export default SKILLS_ENUM
+module.exports = { SKILLS_ENUM };
