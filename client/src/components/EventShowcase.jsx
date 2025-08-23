@@ -1,6 +1,6 @@
-
 import React from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 
 /* ---------- Icons ---------- */
 const CalendarIcon = (props) => (
@@ -14,13 +14,10 @@ const LocationIcon = (props) => (
   </svg>
 );
 
-/* ---------- Card ---------- */
+/* ---------- Event Card ---------- */
 const EventCard = ({ event, onRegister }) => {
   const spotsLeft = event.maxCapacity - event.registeredCount;
-  const fillPercentage = Math.min(
-    100,
-    Math.max(0, (event.registeredCount / event.maxCapacity) * 100)
-  );
+  const fillPercentage = Math.min(100, Math.max(0, (event.registeredCount / event.maxCapacity) * 100));
 
   const statusTone =
     spotsLeft === 0 ? "text-red-400" : spotsLeft <= 10 ? "text-orange-300" : "text-emerald-400";
@@ -58,7 +55,7 @@ const EventCard = ({ event, onRegister }) => {
 
         {/* category */}
         <div className="absolute left-3 top-3">
-          <motion.span 
+          <motion.span
             className={`rounded-md ${brandGrad} px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur`}
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
@@ -68,7 +65,7 @@ const EventCard = ({ event, onRegister }) => {
         </div>
 
         {/* date pill */}
-        <motion.div 
+        <motion.div
           className="absolute right-3 top-3 rounded-lg bg-white/90 p-2 text-center shadow-sm backdrop-blur"
           whileHover={{ scale: 1.05 }}
           transition={{ duration: 0.2 }}
@@ -133,9 +130,9 @@ const EventCard = ({ event, onRegister }) => {
   );
 };
 
-/* ---------- Showcase (dark) ---------- */
+/* ---------- Showcase Section ---------- */
 const EventsShowcase = () => {
-  // Static demo data
+  // sample demo data
   const featuredEvents = [
     {
       id: 101,
@@ -153,7 +150,7 @@ const EventsShowcase = () => {
     },
     {
       id: 102,
-      title: "Inter‑University Programming Contest",
+      title: "Inter-University Programming Contest",
       image:
         "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=60",
       category: "Programming",
@@ -193,77 +190,13 @@ const EventsShowcase = () => {
       maxCapacity: 150,
       registeredCount: 89,
     },
-    {
-      id: 3,
-      title: "Startup Pitch Competition",
-      image:
-        "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop&q=60",
-      category: "Business",
-      date: "Mar 28, 2024",
-      time: "2:00 PM",
-      month: "MAR",
-      day: "28",
-      location: "Business Hall",
-      maxCapacity: 100,
-      registeredCount: 97,
-    },
-    {
-      id: 4,
-      title: "Green Campus Workshop",
-      image:
-        "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1200&auto=format&fit=crop&q=60",
-      category: "Environment",
-      date: "Apr 5, 2024",
-      time: "10:00 AM",
-      month: "APR",
-      day: "05",
-      location: "Science Building",
-      maxCapacity: 80,
-      registeredCount: 45,
-    },
-    {
-      id: 5,
-      title: "Annual Sports Tournament",
-      image:
-        "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&auto=format&fit=crop&q=60",
-      category: "Sports",
-      date: "Apr 12, 2024",
-      time: "8:00 AM",
-      month: "APR",
-      day: "12",
-      location: "Sports Complex",
-      maxCapacity: 300,
-      registeredCount: 234,
-    },
-    {
-      id: 6,
-      title: "Art & Design Exhibition",
-      image:
-        "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1200&auto=format&fit=crop&q=60",
-      category: "Arts",
-      date: "Apr 18, 2024",
-      time: "3:00 PM",
-      month: "APR",
-      day: "18",
-      location: "Art Gallery",
-      maxCapacity: 120,
-      registeredCount: 67,
-    },
   ];
 
-  const handleRegister = (event) => {
-    console.log("Register clicked for:", event.title);
-  };
-
-  const handleExploreAll = () => {
-    console.log("Explore All Events clicked");
-    // In a real app, this would navigate to the events page
-    // router.push('/events');
-  };
+  const handleRegister = (event) => console.log("Register clicked for:", event.title);
 
   return (
     <section className="relative overflow-hidden bg-[#0b1220] py-16">
-      {/* Enhanced background effects */}
+      {/* bg glows */}
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-0 opacity-20"
@@ -271,16 +204,14 @@ const EventsShowcase = () => {
             backgroundImage:
               "radial-gradient(700px 260px at 15% 85%, rgba(99,102,241,0.25) 0%, transparent 60%), radial-gradient(700px 260px at 85% 15%, rgba(139,92,246,0.25) 0%, transparent 60%)",
           }}
-          aria-hidden
         />
       </div>
 
       <div className="container relative mx-auto max-w-7xl px-6">
-        <motion.div 
+        <motion.div
           className="mb-12 text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
         >
           <p className="mb-2 bg-gradient-to-r from-indigo-300/90 to-violet-300/90 bg-clip-text text-sm font-semibold uppercase tracking-wider text-transparent">
             Featured Events
@@ -291,12 +222,9 @@ const EventsShowcase = () => {
               Events
             </span>
           </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-            Discover and register for exciting events happening on campus and beyond
-          </p>
         </motion.div>
 
-        {/* Auto-scrolling marquee with edge fade + hover pause */}
+        {/* marquee */}
         <div
           className="marquee group relative w-full overflow-hidden"
           style={{
@@ -309,96 +237,21 @@ const EventsShowcase = () => {
           <div className="track flex gap-6 will-change-transform">
             {featuredEvents.concat(featuredEvents).map((e, i) => (
               <div key={`${e.id}-${i}`} className="w-[320px] flex-shrink-0">
-                <EventCard event={e} onRegister={handleRegister} />
+                {/* 👇 now clickable */}
+                <Link to={`/events/${e.id}`} state={{ event: e }}>
+                  <EventCard event={e} onRegister={handleRegister} />
+                </Link>
               </div>
             ))}
           </div>
         </div>
-
-        {/* Explore All Events Button */}
-        <motion.div 
-          className="mt-12 flex justify-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <motion.button
-            onClick={handleExploreAll}
-            className="group relative flex items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 px-6 text-sm font-semibold text-white transition-all duration-300 hover:from-indigo-500 hover:to-violet-500 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900"
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <span className="relative z-10">Explore All Events</span>
-            <svg 
-              className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" 
-              fill="none" 
-              viewBox="0 0 24 24" 
-              stroke="currentColor"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-            
-            {/* Animated background shine effect */}
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-              style={{
-                background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)",
-                transform: "translateX(-100%)",
-                animation: "shine 1.5s infinite"
-              }}
-            />
-          </motion.button>
-        </motion.div>
-
-        {/* bottom stats (dark chip) */}
-        <motion.div 
-          className="mt-8 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <div className="inline-flex items-center gap-6 rounded-full border border-slate-700/40 bg-slate-900/70 px-6 py-3 text-sm text-slate-300 shadow-sm backdrop-blur">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-              <span>50+ Active Events</span>
-            </div>
-            <span className="h-4 w-px bg-slate-700/60" />
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-sky-500" />
-              <span>1000+ Registrations</span>
-            </div>
-          </div>
-        </motion.div>
       </div>
 
-      {/* Works with Vite or Next */}
       <style>{`
-        @keyframes scroll-x {
-          0% { transform: translateX(0%); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes shine {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
-        .marquee .track { 
-          animation: scroll-x var(--marquee-duration, 28s) linear infinite; 
-        }
-        .marquee:hover .track, .marquee:focus-within .track { 
-          animation-play-state: paused; 
-        }
-        @media (prefers-reduced-motion: reduce) { 
-          .marquee .track { 
-            animation: none; 
-            transform: translateX(-50%);
-          } 
-        }
-        @media (min-width: 1024px) { .marquee { --marquee-duration: 26s; } }
-        @media (max-width: 640px) { .marquee { --marquee-duration: 34s; } }
-        .line-clamp-2 {
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-        }
+        @keyframes scroll-x { 0% { transform:translateX(0%);} 100% { transform:translateX(-50%);} }
+        .marquee .track { animation: scroll-x 28s linear infinite; }
+        .marquee:hover .track { animation-play-state: paused; }
+        .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
       `}</style>
     </section>
   );

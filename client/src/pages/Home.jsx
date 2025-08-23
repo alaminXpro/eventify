@@ -9,12 +9,10 @@ import Footer from '../components/Footer.jsx';
 const Home = () => {
     return (
         <div>
-            <Navbar />
             <HeroBanner />
             <ServicesGrid />
             <EventsShowcase />
             <StatsSection />
-            <Footer />
         </div>
     )
 }
