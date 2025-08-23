@@ -7,7 +7,7 @@ function Layout({ children }) {
   const location = useLocation();
 
   // hide navbar/footer on login and signup pages
-  const hideLayout = location.pathname === "/login" || location.pathname === "/signup";
+  const hideLayout = location.pathname === "/login" || location.pathname === "/register";
 
   return (
     <>
