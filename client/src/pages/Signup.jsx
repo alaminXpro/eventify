@@ -1,12 +1,37 @@
-import React, { useMemo, useState } from 'react';
-import { Eye, EyeOff, ArrowLeft, Shield, Zap, Star, Sparkles, CheckCircle2, GraduationCap, UserCog, CalendarDays, Users } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import axios from "axios";
+import Cookies from "js-cookie";
+
+// 👇 bring in the lucide-react icons you actually use
+import {
+  Eye,
+  EyeOff,
+  ArrowLeft,
+  Shield,
+  Zap,
+  Star,
+  Sparkles,
+  CheckCircle2,
+  GraduationCap,
+  UserCog,
+  CalendarDays,
+  Users,
+} from "lucide-react";
+
+import {
+  signUpStart,
+  signUpSuccess,
+  signUpFailure,
+} from "../redux/user/userSlice.js";
+
 
 export default function EventifySignUp() {
   const navigate = useNavigate();
 
   // ----- Form State -----
-  const [fullName, setFullName] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,6 +43,13 @@ export default function EventifySignUp() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [touched, setTouched] = useState({ name: false, email: false, password: false, confirm: false, role: false });
+
+
+
+    const API_BASE = import.meta.env.VITE_API_BASE;
+
+
+
 
   // ----- Helpers & Validation -----
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -34,13 +66,12 @@ export default function EventifySignUp() {
   const strengthLabel = ['Weak', 'Okay', 'Good', 'Strong', 'Very strong'];
   const strength = strengthLabel[Math.max(0, fulfilledCount - 1)];
 
-  const nameError = touched.name && fullName.trim().length < 2 ? 'Enter your full name' : '';
+  const nameError = touched.name && name.trim().length < 2 ? 'Enter your full name' : '';
   const emailError = touched.email && !isValidEmail(email) ? 'Enter a valid email address' : '';
   const passwordError = touched.password && fulfilledCount < 3 ? 'Use at least 8 chars incl. numbers & letters' : '';
   const confirmError = touched.confirm && confirmPassword !== password ? "Passwords don't match" : '';
   const roleError = touched.role && !role ? 'Select a role' : '';
 
-  // Removed canSubmit variable that was disabling the button
 
   // ----- Navigation -----
   const handleBackToHome = () => navigate('/');
@@ -53,22 +84,66 @@ export default function EventifySignUp() {
     setTimeout(() => setIsLoading(false), 1500);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setTouched({ name: true, email: true, password: true, confirm: true, role: true });
-    
-    // Validate all fields before submission
-    if (!fullName || !isValidEmail(email) || fulfilledCount < 3 || confirmPassword !== password || !agree || !role) {
-      return; // Don't proceed if validation fails
-    }
+  const dispatch = useDispatch();
 
-    setIsLoading(true);
-    console.log('Signup attempt:', { fullName, email, role });
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/onboarding');
-    }, 1500);
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!agree) {
+    alert("You must agree to the Terms & Privacy Policy");
+    return;
+  }
+
+  const formData = {
+    name,
+    email,
+    password,
+    //role,
   };
+
+  try {
+    dispatch(signUpStart());
+    setIsLoading(true);
+
+    // Register
+    const res = await axios.post(`${API_BASE}/auth/register`, formData, {
+      withCredentials: true,
+    });
+
+    // ⚠️ HttpOnly cookies must come from the server,
+    // so here we only store tokens if the backend doesn’t set them.
+    Cookies.set("accessToken", res.data.tokens.access.token, {
+      expires: new Date(res.data.tokens.access.expires),
+      secure: true,
+      sameSite: "none",
+    });
+    Cookies.set("refreshToken", res.data.tokens.refresh.token, {
+      expires: new Date(res.data.tokens.refresh.expires),
+      secure: true,
+      sameSite: "none",
+    });
+
+    dispatch(signUpSuccess(res.data));
+    navigate("/");
+  } catch (error) {
+    dispatch(
+      signUpFailure(error.response?.data?.message || error.message)
+    );
+  } finally {
+    setIsLoading(false);
+    // optional email verification call
+    try {
+      await axios.post(
+        `${API_BASE}/auth/send-verification-email`,
+        {},
+        { withCredentials: true }
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 flex">
@@ -217,16 +292,16 @@ export default function EventifySignUp() {
                 <button
                   type="button"
                   role="radio"
-                  aria-checked={role === 'Student'}
-                  onClick={() => setRole('Student')}
+                  aria-checked={role === 'user'}
+                  onClick={() => setRole('user')}
                   onBlur={() => setTouched((t) => ({ ...t, role: true }))}
-                  className={`flex items-center gap-3 p-4 border rounded-xl transition-all duration-300 hover:bg-gray-50 ${role === 'Student' ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50' : 'border-gray-200'}`}
+                  className={`flex items-center gap-3 p-4 border rounded-xl transition-all duration-300 hover:bg-gray-50 ${role === 'user' ? 'border-indigo-600 ring-2 ring-indigo-200 bg-indigo-50' : 'border-gray-200'}`}
                 >
                   <div className="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
                     <GraduationCap size={18} />
                   </div>
                   <div className="text-left">
-                    <div className="font-semibold text-gray-900">Student</div>
+                    <div className="font-semibold text-gray-900">User</div>
                     <div className="text-xs text-gray-600">Discover & RSVP to events</div>
                   </div>
                 </button>
@@ -256,8 +331,8 @@ export default function EventifySignUp() {
               <label className="block text-sm font-semibold text-gray-700">Full Name</label>
               <input
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 onBlur={() => setTouched((t) => ({ ...t, name: true }))}
                 className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 ${nameError ? 'border-red-500' : 'border-gray-200'}`}
                 placeholder="Enter your full name"
@@ -367,19 +442,20 @@ export default function EventifySignUp() {
             </div>
 
             {/* Submit */}
-            <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all duration-300 shadow-lg"
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Creating account...</span>
-                </div>
-              ) : (
-                'Create account'
-              )}
-            </button>
+<button
+  type="submit"
+  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all duration-300 shadow-lg"
+>
+  {isLoading ? (
+    <div className="flex items-center justify-center space-x-2">
+      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+      <span>Creating account...</span>
+    </div>
+  ) : (
+    "Create account"
+  )}
+</button>
+
           </form>
 
           {/* Sign In Link */}
