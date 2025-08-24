@@ -1,6 +1,7 @@
 // src/components/Navbar.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import api from "../utils/axiosInstance";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -37,13 +38,37 @@ export default function Navbar() {
     return () => document.removeEventListener("keydown", onEsc);
   }, []);
 
-    const headerClass = scrolled
-        ? "bg-[#0f172a] backdrop-blur-xl border-b border-white/10 shadow-lg"
-        : "bg-[#0f172a] backdrop-blur-md border-b border-white/10";
+  const headerClass = scrolled
+    ? "bg-[#0f172a] backdrop-blur-xl border-b border-white/10 shadow-lg"
+    : "bg-[#0f172a] backdrop-blur-md border-b border-white/10";
 
   const baseLink =
     "px-3 py-2 rounded-md text-gray-200 hover:text-white hover:bg-white/10 transition";
   const activeLink = "text-white bg-white/10";
+
+  const actoken = (() => {
+    try {
+      const persisted = localStorage.getItem("accessToken");
+      if (!persisted) return null;
+      return persisted
+    } catch {
+      return null;
+    }
+  })();
+
+  const handleLogout = async () => {
+    try {
+      await api.post('auth/logout');
+      localStorage.clear();
+      // You might want to redirect to home or login page here
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Clear localStorage even if API call fails
+      localStorage.clear();
+      window.location.href = "/";
+    }
+  };
 
   return (
     <header className={`sticky top-0 z-50 h-16 transition-colors duration-300 ${headerClass}`}>
@@ -71,9 +96,8 @@ export default function Navbar() {
             <button
               ref={clubsBtnRef}
               onClick={() => setClubsOpen((v) => !v)}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md transition hover:bg-white/10 ${
-                clubsOpen ? "bg-white/10 text-sky-300" : "text-gray-200 hover:text-white"
-              }`}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md transition hover:bg-white/10 ${clubsOpen ? "bg-white/10 text-sky-300" : "text-gray-200 hover:text-white"
+                }`}
             >
               Clubs
               <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" className={`transition-transform ${clubsOpen ? "rotate-180" : ""}`}>
@@ -105,15 +129,29 @@ export default function Navbar() {
 
           <li><NavLink to="/events" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Events</NavLink></li>
           <li><NavLink to="/dashboard" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Dashboard</NavLink></li>
-          <li><NavLink to="/profile" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Profile</NavLink></li>
+          {actoken && (
+            <li><NavLink to="/profile" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Profile</NavLink></li>
+          )}
           <li><NavLink to="/faq" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>FAQ</NavLink></li>
         </ul>
 
         {/* Right desktop actions */}
         <div className="ml-auto hidden md:flex items-center gap-2">
-          <Link to="/login" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
-            Login
-          </Link>
+          {actoken ? (
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-white/10 hover:text-white transition"
+            >
+              Logout
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition"
+            >
+              Login
+            </Link>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -157,21 +195,38 @@ export default function Navbar() {
                     <NavLink to="/clubs" className="rounded-md px-3 py-2 text-sm text-sky-300 hover:bg-white/10">View All Clubs →</NavLink>
                   </div>
                 </details>
-                <NavLink to="/about" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
-                  About Us
+                <NavLink to="/events" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                  Events
                 </NavLink>
                 <NavLink to="/dashboard" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
                   Dashboard
                 </NavLink>
-                <NavLink to="/profile" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
-                  Profile
+                {actoken && (
+                  <NavLink to="/profile" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                    Profile
+                  </NavLink>
+                )}
+                <NavLink to="/faq" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                  FAQ
                 </NavLink>
               </div>
 
               <div className="mt-3">
-                <Link to="/login" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
-                  Login
-                </Link>
+                {actoken ? (
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left rounded-md border border-white/20 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-white/10 hover:text-white transition"
+                  >
+                    Logout
+                  </button>
+                ) : (
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition"
+                  >
+                    Login
+                  </Link>
+                )}
               </div>
             </div>
           </div>

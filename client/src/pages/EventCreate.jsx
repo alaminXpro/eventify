@@ -588,7 +588,7 @@ export default function EventCreate() {
                   <MapPin className="mr-1 inline h-4 w-4 text-indigo-300" />
                   Location *
                 </label>
-                <input
+                <select
                   value={form.location}
                   onChange={(e) => setField("location", e.target.value)}
                   placeholder="e.g., Main Auditorium"
@@ -598,6 +598,7 @@ export default function EventCreate() {
                 />
                 {errors.location && <p className="mt-1 text-xs text-rose-400">{errors.location}</p>}
               </div>
+
 
               <div>
                 <label className="mb-1 block text-sm font-semibold">
