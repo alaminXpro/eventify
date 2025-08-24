@@ -46,17 +46,17 @@ const adaptEvent = (e) => {
 
   const dateStr = startsAt
     ? new Date(startsAt).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
     : "";
 
   const timeStr = startsAt
     ? new Date(startsAt).toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      })
+      hour: "numeric",
+      minute: "2-digit",
+    })
     : "";
 
   return {
@@ -173,11 +173,10 @@ const EventCard = ({ event, onRegister }) => {
 
         <motion.button
           onClick={() => onRegister?.(event)}
-          className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-            spotsLeft === 0
+          className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${spotsLeft === 0
               ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
               : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-400 hover:to-violet-500"
-          }`}
+            }`}
           disabled={spotsLeft === 0}
           whileHover={spotsLeft > 0 ? { scale: 1.02 } : {}}
           whileTap={spotsLeft > 0 ? { scale: 0.98 } : {}}
@@ -355,7 +354,20 @@ const Events = () => {
     if (!hasMore || loadingMore) return;
     setPage((p) => p + 1);
   };
+ const [role] = useState(() => {
+    try {
+      const persistedState = localStorage.getItem('persist:root');
+      if (!persistedState) return null;
 
+      const parsedState = JSON.parse(persistedState);
+      const userState = JSON.parse(parsedState.user);
+
+      return userState.currentUser?.role || null;
+    } catch (err) {
+      console.error("Failed to parse userId from localStorage:", err);
+      return null;
+    }
+  });
   // IntersectionObserver to auto-load more
   useEffect(() => {
     if (prefersReducedMotion) return;
@@ -393,13 +405,13 @@ const Events = () => {
           </div>
 
           {/* Desktop Create button (quick access) */}
-          <Link
-            to="/events/new"
+          {role=="moderator"?(<Link
+            to="/events/create"
             className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
           >
             <PlusIcon className="h-4 w-4" />
             Create Event
-          </Link>
+          </Link>):null}
         </div>
 
         {/* Sticky Controls */}
@@ -425,9 +437,8 @@ const Events = () => {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
-                    activeCategory === cat ? "bg-indigo-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-800"
-                  }`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${activeCategory === cat ? "bg-indigo-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-800"
+                    }`}
                 >
                   {cat}
                 </button>
@@ -508,7 +519,7 @@ const Events = () => {
 
       {/* Floating Create FAB for mobile */}
       <Link
-        to="/events/new"
+        to="/events/create"
         className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
         aria-label="Create Event"
       >

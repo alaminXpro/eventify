@@ -42,7 +42,11 @@ const checkEventClubOwnership = catchAsync(async (req, res, next) => {
     }
 
     // Check if user is a moderator of the club
-    const isModerator = club.moderators.some(moderatorId => moderatorId.toString() === user.id);
+    console.log(user.id)
+    console.log("Club moderators:", club.moderators.map(m => m.toString()));
+    const isModerator = club.moderators.some(
+      moderator => moderator._id.toString() === user.id
+    );
     if (!isModerator) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You can only manage events for clubs you moderate');
     }
