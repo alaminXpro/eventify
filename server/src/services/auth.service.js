@@ -90,10 +90,29 @@ const verifyEmail = async (verifyEmailToken) => {
   }
 };
 
+/**
+ * Validate refresh token and return user info
+ * @param {string} refreshToken
+ * @returns {Promise<Object>}
+ */
+const validateRefreshToken = async (refreshToken) => {
+  try {
+    const refreshTokenDoc = await tokenService.verifyToken(refreshToken, tokenTypes.REFRESH);
+    const user = await userService.getUserById(refreshTokenDoc.user);
+    if (!user) {
+      return { valid: false, user: null };
+    }
+    return { valid: true, user };
+  } catch (error) {
+    return { valid: false, user: null };
+  }
+};
+
 module.exports = {
   loginUserWithEmailAndPassword,
   logout,
   refreshAuth,
   resetPassword,
   verifyEmail,
+  validateRefreshToken,
 };

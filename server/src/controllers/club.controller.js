@@ -55,18 +55,17 @@ const joinClub = catchAsync(async (req, res) => {
 
 const getPendingMembers = catchAsync(async (req, res) => {
   const { clubId } = req.params;
-  const { moderatorId } = req.body;
-  const pendings = await clubService.getPendingMembers(clubId, moderatorId);
+  const pendings = await clubService.getPendingMembers(clubId);
   res.send(pendings);
 });
 
 const getClubMembers = catchAsync(async (req, res) => {
-  const members = await clubService.getClubMembers(req.params.clubId, req.body.moderatorId);
+  const members = await clubService.getClubMembers(req.params.clubId);
   res.send(members);
 });
 
 const getClubModerators = catchAsync(async (req, res) => {
-  const moderators = await clubService.getClubModerators(req.params.clubId, req.body.moderatorId);
+  const moderators = await clubService.getClubModerators(req.params.clubId);
   res.send(moderators);
 });
 

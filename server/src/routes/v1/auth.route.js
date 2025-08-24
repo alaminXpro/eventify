@@ -14,6 +14,7 @@ router.post('/forgot-password', validate(authValidation.forgotPassword), authCon
 router.post('/reset-password', validate(authValidation.resetPassword), authController.resetPassword);
 router.post('/send-verification-email', auth(), authController.sendVerificationEmail);
 router.post('/verify-email', validate(authValidation.verifyEmail), authController.verifyEmail);
+router.post('/validate-session', validate(authValidation.validateSession), authController.validateSession);
 
 // Google Auth route
 router.post('/google', validate(authValidation.googleAuth), authController.googleAuth);
@@ -351,4 +352,55 @@ module.exports = router;
  *             example:
  *               code: 401
  *               message: verify email failed
+ */
+
+/**
+ * @swagger
+ * /auth/validate-session:
+ *   post:
+ *     summary: Validate user session using refresh token
+ *     description: Check if the user's session is still valid by verifying the refresh token. This endpoint can be called periodically to ensure the user is still authenticated.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *             example:
+ *               refreshToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ZWJhYzUzNDk1NGI1NDEzOTgwNmMxMTIiLCJpYXQiOjE1ODkyOTg0ODQsImV4cCI6MTU4OTMwMDI4NH0.m1U63blB0MLej_WfB7yC2FTMnCziif9X8yzwDEfJXAg
+ *     responses:
+ *       "200":
+ *         description: Session is valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isValid:
+ *                   type: boolean
+ *                   example: true
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
+ *                   example: "Session is valid"
+ *       "401":
+ *         description: Session is invalid or expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isValid:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Session is invalid or expired"
  */

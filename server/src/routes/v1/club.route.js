@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
+const { checkClubOwnership } = require('../../middlewares/clubAuth');
 const clubValidation = require('../../validations/club.validation');
 const clubController = require('../../controllers/club.controller');
 
@@ -210,8 +211,8 @@ router
 router
   .route('/:clubId')
   .get(auth('getClubs'), validate(clubValidation.getClub), clubController.getClub)
-  .patch(auth('manageClubs'), validate(clubValidation.updateClub), clubController.updateClub)
-  .delete(auth('addClub'), validate(clubValidation.deleteClub), clubController.deleteClub);
+  .patch(auth('manageClubs'), checkClubOwnership, validate(clubValidation.updateClub), clubController.updateClub)
+  .delete(auth('addClub'), checkClubOwnership, validate(clubValidation.deleteClub), clubController.deleteClub);
 
 
 /**
@@ -379,9 +380,9 @@ router
  */
 router
   .route('/:clubId/moderators')
-  .patch(auth('manageClubs'), validate(clubValidation.addModeratorToClub), clubController.addModeratorToClub)
-  .delete(auth('manageClubs'), validate(clubValidation.removeModeratorFromClub), clubController.removeModeratorFromClub)
-  .post(auth('manageClubs'), validate(clubValidation.getClubModerators), clubController.getClubModerators);
+  .patch(auth('manageClubs'), checkClubOwnership, validate(clubValidation.addModeratorToClub), clubController.addModeratorToClub)
+  .delete(auth('manageClubs'), checkClubOwnership, validate(clubValidation.removeModeratorFromClub), clubController.removeModeratorFromClub)
+  .post(auth('manageClubs'), checkClubOwnership, validate(clubValidation.getClubModerators), clubController.getClubModerators);
 
 /**
  * @swagger
@@ -437,8 +438,8 @@ router
  */
 router
   .route('/:clubId/members')
-  .patch(auth('manageClubs'), validate(clubValidation.approveClubMember), clubController.approveClubMember)
-  .post(auth('manageClubs'), validate(clubValidation.getClubMembers), clubController.getClubMembers);
+  .patch(auth('manageClubs'), checkClubOwnership, validate(clubValidation.approveClubMember), clubController.approveClubMember)
+  .post(auth('manageClubs'), checkClubOwnership, validate(clubValidation.getClubMembers), clubController.getClubMembers);
 
 
 /**
@@ -495,8 +496,8 @@ router
  */
 router
   .route('/:clubId/pendings')
-  .post(auth('manageClubs'), validate(clubValidation.getPendingMembers), clubController.getPendingMembers)
-  .delete(auth('manageClubs'), validate(clubValidation.deleteClubMember), clubController.removeUserFromPendingList);
+  .post(auth('manageClubs'), checkClubOwnership, validate(clubValidation.getPendingMembers), clubController.getPendingMembers)
+  .delete(auth('manageClubs'), checkClubOwnership, validate(clubValidation.deleteClubMember), clubController.removeUserFromPendingList);
 
 
 /**
@@ -527,7 +528,7 @@ router
  */
 router
   .route('/:clubId/approve')
-  .post(auth('manageClubs'), validate(clubValidation.approveClubMember), clubController.approveClubMember);
+  .post(auth('manageClubs'), checkClubOwnership, validate(clubValidation.approveClubMember), clubController.approveClubMember);
 
 /**
  * @swagger
@@ -557,7 +558,7 @@ router
  */
 router
   .route('/:clubId/delete')
-  .post(auth('manageClubs'), validate(clubValidation.deleteClubMember), clubController.deleteClubMember);
+  .post(auth('manageClubs'), checkClubOwnership, validate(clubValidation.deleteClubMember), clubController.deleteClubMember);
 
 
 

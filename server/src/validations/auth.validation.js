@@ -71,6 +71,17 @@ const googleAuth = {
   }),
 };
 
+const validateSession = {
+  body: Joi.object().keys({
+    refreshToken: Joi.string().optional(),
+  }).unknown(true),
+  cookies: Joi.object().keys({
+    refreshToken: Joi.string().optional(),
+    accessToken: Joi.string().optional(),
+  }).unknown(true),
+  custom: Joi.object().custom(customValidation, 'Custom validation').required(),
+};
+
 module.exports = {
   register,
   login,
@@ -80,4 +91,5 @@ module.exports = {
   resetPassword,
   verifyEmail,
   googleAuth,
+  validateSession,
 };

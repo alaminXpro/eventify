@@ -35,26 +35,17 @@ const getPendingMembers = {
   params: Joi.object().keys({
     clubId: Joi.string().custom(objectId).required(),
   }),
-  body: Joi.object().keys({
-    moderatorId: Joi.string().custom(objectId).required(),
-  }),
 };
 
 const getClubMembers = {
   params: Joi.object().keys({
     clubId: Joi.string().custom(objectId).required(),
   }),
-  body: Joi.object().keys({
-    moderatorId: Joi.string().custom(objectId).required(),
-  }),
 };
 
 const getClubModerators = {
   params: Joi.object().keys({
     clubId: Joi.string().custom(objectId).required(),
-  }),
-  body: Joi.object().keys({
-    moderatorId: Joi.string().custom(objectId).required(),
   }),
 };
 

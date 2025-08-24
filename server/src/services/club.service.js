@@ -46,16 +46,12 @@ const getClubById = async (id) => {
 /**
  * Get pending members of a club
  * @param {ObjectId} clubId
- * @param {ObjectId} moderatorId
  * @returns {Promise<Array>}
  */
-const getPendingMembers = async (clubId, moderatorId) => {
+const getPendingMembers = async (clubId) => {
   const club = await getClubById(clubId);
   if (!club) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Club not found');
-  }
-  if (!club.moderators.some((mod) => mod._id.toString() === moderatorId.toString())) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Not authorized');
   }
   return club.pendings;
 };
@@ -63,16 +59,12 @@ const getPendingMembers = async (clubId, moderatorId) => {
 /**
  * Get members of a club
  * @param {ObjectId} clubId
- * @param {ObjectId} moderatorId
  * @returns {Promise<Array>}
  */
-const getClubMembers = async (clubId, moderatorId) => {
+const getClubMembers = async (clubId) => {
   const club = await getClubById(clubId);
   if (!club) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Club not found');
-  }
-  if (!club.moderators.some((mod) => mod._id.toString() === moderatorId.toString())) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Not authorized');
   }
   return club.members;
 };
@@ -80,16 +72,12 @@ const getClubMembers = async (clubId, moderatorId) => {
 /**
  * Get moderators of a club
  * @param {ObjectId} clubId
- * @param {ObjectId} moderatorId
  * @returns {Promise<Array>}
  */
-const getClubModerators = async (clubId, moderatorId) => {
+const getClubModerators = async (clubId) => {
   const club = await getClubById(clubId);
   if (!club) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Club not found');
-  }
-  if (!club.moderators.some((mod) => mod._id.toString() === moderatorId.toString())) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'Not authorized');
   }
   return club.moderators;
 };

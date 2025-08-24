@@ -153,6 +153,38 @@ const verifyEmail = catchAsync(async (req, res) => {
   res.status(httpStatus.NO_CONTENT).send();
 });
 
+const validateSession = catchAsync(async (req, res) => {
+  const refreshToken = req.body.refreshToken || req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(httpStatus.UNAUTHORIZED).send({ 
+      isValid: false, 
+      message: 'No refresh token provided' 
+    });
+  }
+
+  try {
+    const isValid = await authService.validateRefreshToken(refreshToken);
+    if (isValid.valid) {
+      res.status(httpStatus.OK).send({
+        isValid: true,
+        user: isValid.user,
+        message: 'Session is valid'
+      });
+    } else {
+      res.status(httpStatus.UNAUTHORIZED).send({
+        isValid: false,
+        message: 'Session is invalid or expired'
+      });
+    }
+  } catch (error) {
+    res.status(httpStatus.UNAUTHORIZED).send({
+      isValid: false,
+      message: 'Session validation failed'
+    });
+  }
+});
+
 module.exports = {
   register,
   login,
@@ -164,4 +196,5 @@ module.exports = {
   resetPassword,
   sendVerificationEmail,
   verifyEmail,
+  validateSession,
 };
