@@ -50,19 +50,34 @@ const updateUser = {
       email: Joi.string().email().optional(),
       name: Joi.string().optional(),
       avatar: Joi.string().uri().optional(),
-      department: Joi.string().valid('CSE', 'EEE', 'CE', 'ME', 'BBA', 'TE', 'IPE', '').allow('', null),
-      semester: Joi.string().valid('1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2', '').allow('', null),
-      studentId: Joi.string().optional(),
+
+      department: Joi.string()
+        .valid('CSE', 'EEE', 'CE', 'ME', 'BBA', 'TE', 'IPE', '')
+        .allow('', null),
+
+      semester: Joi.string()
+        .valid('1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '4.1', '4.2', '')
+        .allow('', null),
+
+      // ✅ allow clearing studentId
+      studentId: Joi.string().allow('', null),
+
       bio: Joi.string().max(500).allow('', null),
       profession: Joi.string().allow('', null),
+
+      // accept array OR comma string
       skills: Joi.alternatives().try(
         Joi.array().items(Joi.string()),
         Joi.string().custom((value, helpers) => {
-          if (value.trim() === '') return [];
-          return value.split(',').map(skill => skill.trim());
+          if (!value || value.trim() === '') return [];
+          return value.split(',').map((s) => s.trim());
         })
       ).allow('', null),
-      phone: Joi.string().pattern(/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/).allow('', null),
+
+      phone: Joi.string()
+        .pattern(/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s./0-9]*$/)
+        .allow('', null),
+
       address: Joi.string().allow(''),
       website: Joi.string().uri().allow('', null),
       cv: Joi.string().uri().allow('', null),
@@ -70,6 +85,25 @@ const updateUser = {
       twitter: Joi.string().uri().allow('', null),
       facebook: Joi.string().uri().allow('', null),
       github: Joi.string().uri().allow('', null),
+
+      // ✅ ADD preferences to match your Mongoose schema
+      preferences: Joi.object({
+        preferredEventCategory: Joi.array().items(
+          Joi.string().valid('Tech', 'Business', 'Design', 'Marketing', 'Finance', 'Law', 'Health', 'Education', 'Other')
+        ).default([]),
+
+        preferredEventFormat: Joi.array().items(
+          Joi.string().valid('Online', 'Offline', 'Hybrid', 'Workshop', 'Seminar', 'Conference', 'Hackathon', 'Meetup', 'Other')
+        ).default([]),
+
+        eventGroupSize: Joi.array().items(
+          Joi.string().valid('Small (1-10)', 'Medium (11-50)', 'Large (51-100)', 'Very Large (100+)')
+        ).default([]),
+
+        eventPopularity: Joi.array().items(
+          Joi.string().valid('Low', 'Medium', 'High', 'Very High')
+        ).default([]),
+      }).optional(),
     })
     .min(1),
 };

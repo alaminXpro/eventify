@@ -3,6 +3,7 @@ node_modules
 
 # yarn error logs
 yarn-error.log
+node_modules
 
 # Environment varibales
 .env*

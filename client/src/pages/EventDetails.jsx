@@ -1,7 +1,8 @@
-// src/pages/EventDetails.jsx
+// src/pages/EventDetails.jsx (clean)
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
+import api from "../utils/axiosInstance";
 
 /* tiny inline icon set */
 const CalendarIcon = (p) => (
@@ -20,35 +21,86 @@ const UsersIcon = (p) => (
   </svg>
 );
 
+// ===== Helpers to adapt backend -> UI =====
+const fromMongoId = (id) => (id && typeof id === "object" && id.$oid ? id.$oid : id);
+const fromMongoDate = (d) => {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  if (typeof d === "string" || typeof d === "number") return new Date(d);
+  if (typeof d === "object" && d.$date) return new Date(d.$date);
+  return null;
+};
+
+const adaptEvent = (doc) => {
+  const id = fromMongoId(doc?._id) || doc?.id || doc?.event_id;
+  const startsAt = fromMongoDate(doc?.event_date) || fromMongoDate(doc?.startsAt) || fromMongoDate(doc?.start_time);
+  const regDeadline = fromMongoDate(doc?.registration_deadline);
+
+  const dateStr = startsAt
+    ? new Date(startsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "";
+  const timeStr = startsAt
+    ? new Date(startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : "";
+
+  return {
+    id,
+    title: doc?.title || doc?.name || "Untitled Event",
+    description: doc?.event_description || doc?.description || "",
+    image: doc?.event_image || doc?.bannerUrl || doc?.image || "",
+    category: doc?.category || "General",
+    type: doc?.event_type || doc?.type || "",
+    date: dateStr,
+    time: timeStr,
+    startsAt,
+    registrationDeadline: regDeadline,
+    duration: doc?.event_time_duration,
+    location: doc?.location || doc?.venue || "TBA",
+    maxCapacity: doc?.capacity ?? 0,
+    registeredCount: doc?.total_registrations ?? 0,
+  };
+};
+
 export default function EventDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { state } = useLocation();
-  const eventFromState = state?.event;
 
-  const [event, setEvent] = useState(eventFromState || null);
-  const [loading, setLoading] = useState(!eventFromState);
+  // If navigated from list, we may have an event shape already
+  const eventFromState = state?.event ? state.event : null;
+
+  const [event, setEvent] = useState(eventFromState ? adaptEvent(eventFromState._raw || eventFromState) : null);
+  const [loading, setLoading] = useState(!event);
   const [error, setError] = useState("");
 
-  // Try to fetch if user hit the URL directly (no router state)
+  // Fetch fresh from backend if needed
   useEffect(() => {
-    if (eventFromState) return;
-    setLoading(true);
+    if (event) return; // already adapted from state
 
-    /* ====== BACKEND HOOK ======
-       fetch(`/api/events/${id}`)
-         .then(r => r.ok ? r.json() : Promise.reject())
-         .then(data => { setEvent(data); setLoading(false); })
-         .catch(() => { setError("Event not found"); setLoading(false); });
-    ============================ */
+    let ignore = false;
+    const controller = new AbortController();
 
-    // Demo fallback (no backend): simple "not found"
-    const t = setTimeout(() => {
-      setError("Event not found. Return to events list.");
-      setLoading(false);
-    }, 400);
-    return () => clearTimeout(t);
-  }, [id, eventFromState]);
+    async function run() {
+      try {
+        setLoading(true);
+        const res = await api.get(`/events/${id}`, { signal: controller.signal });
+        const data = res?.data;
+        if (ignore) return;
+        setEvent(adaptEvent(data));
+      } catch (e) {
+        if (e?.name === "CanceledError" || e?.name === "AbortError") return;
+        if (!ignore) setError("Event not found");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
+  }, [id, event]);
 
   // Parallax header
   const { scrollY } = useScroll();
@@ -57,20 +109,19 @@ export default function EventDetails() {
 
   const spotsLeft = useMemo(() => {
     if (!event) return 0;
-    return event.maxCapacity - event.registeredCount;
+    const left = (event.maxCapacity || 0) - (event.registeredCount || 0);
+    return Math.max(0, left);
   }, [event]);
+
   const fillPct = useMemo(() => {
-    if (!event) return 0;
-    return Math.min(100, Math.max(0, (event.registeredCount / event.maxCapacity) * 100));
+    if (!event || !event.maxCapacity) return 0;
+    return Math.min(100, Math.max(0, ((event.registeredCount || 0) / event.maxCapacity) * 100));
   }, [event]);
 
   const brandGrad = "bg-gradient-to-r from-indigo-500 to-violet-500";
 
   const handleRegister = () => {
     if (!event) return;
-    /* ====== BACKEND HOOK ======
-       fetch(`/api/events/${event.id}/register`, { method: "POST" })
-    ================================= */
     alert(`Pretend registered for: ${event.title}`);
   };
 
@@ -84,12 +135,12 @@ export default function EventDetails() {
     );
   }
 
-  if (error) {
+  if (error || !event) {
     return (
       <section className="min-h-[60vh] bg-[#0b1220]">
         <div className="mx-auto max-w-5xl px-6 py-16">
           <div className="rounded-xl border border-red-500/30 bg-red-900/20 p-8 text-red-200">
-            <p className="mb-6">{error}</p>
+            <p className="mb-6">{error || "Event not found"}</p>
             <button
               onClick={() => navigate("/events")}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
@@ -106,13 +157,12 @@ export default function EventDetails() {
     <section className="relative min-h-screen bg-[#0b1220] text-slate-100">
       {/* HERO */}
       <div className="relative">
-        <motion.div style={{ y, scale }} className="h-[46vh] w-full overflow-hidden">
-          <img
-            src={event.image}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="eager"
-          />
+        <motion.div style={{ y, scale }} className="h-[40vh] w-full overflow-hidden">
+          {event.image ? (
+            <img src={event.image} alt="" className="h-full w-full object-cover" loading="eager" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-slate-900">No image</div>
+          )}
         </motion.div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#0b1220] via-[#0b1220]/40 to-transparent" />
         {/* Title block */}
@@ -127,21 +177,28 @@ export default function EventDetails() {
               {event.title}
             </motion.h1>
             <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-200">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
-                <CalendarIcon className="h-4 w-4 text-indigo-300" />
-                {event.date} • {event.time}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
-                <LocationIcon className="h-4 w-4 text-indigo-300" />
-                {event.location}
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
-                <UsersIcon className="h-4 w-4 text-indigo-300" />
-                {event.registeredCount}/{event.maxCapacity} registered
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500/80 to-violet-500/80 px-3 py-1 font-semibold">
-                {event.category}
-              </span>
+              {(event.date || event.time) && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
+                  <CalendarIcon className="h-4 w-4 text-indigo-300" />
+                  {event.date}{event.time ? ` • ${event.time}` : ""}
+                </span>
+              )}
+              {event.location && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
+                  <LocationIcon className="h-4 w-4 text-indigo-300" />
+                  {event.location}
+                </span>
+              )}
+              {event.type && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500/80 to-violet-500/80 px-3 py-1 font-semibold">
+                  {event.type}
+                </span>
+              )}
+              {event.category && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 font-semibold">
+                  {event.category}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -166,47 +223,27 @@ export default function EventDetails() {
           >
             <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
               <h2 className="mb-3 text-xl font-bold">About this event</h2>
-              <p className="text-slate-300">
-                Join us for <span className="font-semibold text-slate-100">{event.title}</span> at{" "}
-                {event.location}. Expect hands-on sessions, expert speakers, and a high-energy crowd.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
-                <h3 className="mb-3 text-lg font-semibold">What you’ll experience</h3>
-                <ul className="space-y-2 text-slate-300">
-                  <li>• Engaging talks and live demos</li>
-                  <li>• Meet & collaborate with peers</li>
-                  <li>• Practical takeaways and resources</li>
-                </ul>
-              </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
-                <h3 className="mb-3 text-lg font-semibold">Agenda (high level)</h3>
-                <ul className="space-y-2 text-slate-300">
-                  <li>• Check-in & welcome</li>
-                  <li>• Keynotes / workshops</li>
-                  <li>• Networking + closing notes</li>
-                </ul>
-              </div>
+              {event.description ? (
+                <p className="whitespace-pre-wrap text-slate-300">{event.description}</p>
+              ) : (
+                <p className="text-slate-300">No description provided.</p>
+              )}
             </div>
 
             <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
-              <h3 className="mb-4 text-lg font-semibold">Speakers</h3>
-              <div className="flex flex-wrap gap-4">
-                {["Alex Kim", "Jordan Lee", "Taylor Morgan"].map((name, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-xl border border-slate-800/60 bg-slate-900/50 px-3 py-2"
-                  >
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500" />
-                    <div>
-                      <div className="text-sm font-semibold">{name}</div>
-                      <div className="text-xs text-slate-400">Guest Speaker</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <h3 className="mb-3 text-lg font-semibold">Details</h3>
+              <ul className="space-y-2 text-slate-300">
+                {event.duration && <li>• Duration: {event.duration}</li>}
+                {event.registrationDeadline && (
+                  <li>
+                    • Registration deadline: {new Date(event.registrationDeadline).toLocaleString()}
+                  </li>
+                )}
+                {typeof event.maxCapacity === "number" && (
+                  <li>• Capacity: {event.maxCapacity}</li>
+                )}
+                <li>• Type: {event.type || "—"}</li>
+              </ul>
             </div>
           </motion.div>
 
@@ -218,29 +255,33 @@ export default function EventDetails() {
             className="md:sticky md:top-20"
           >
             <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6 shadow-lg backdrop-blur">
-              {/* capacity */}
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm text-slate-300">Spots</span>
-                <span
-                  className={`text-sm font-semibold ${
-                    spotsLeft === 0
-                      ? "text-red-400"
-                      : spotsLeft <= 10
-                      ? "text-orange-300"
-                      : "text-emerald-400"
-                  }`}
-                >
-                  {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
-                </span>
-              </div>
-              <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
-                <motion.div
-                  className={`h-2 rounded-full ${brandGrad}`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${fillPct}%` }}
-                  transition={{ duration: 0.9 }}
-                />
-              </div>
+              {/* capacity progress */}
+              {typeof event.maxCapacity === "number" && (
+                <>
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="text-sm text-slate-300">Spots</span>
+                    <span
+                      className={`text-sm font-semibold ${
+                        spotsLeft === 0
+                          ? "text-red-400"
+                          : spotsLeft <= 10
+                          ? "text-orange-300"
+                          : "text-emerald-400"
+                      }`}
+                    >
+                      {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
+                    </span>
+                  </div>
+                  <div className="mb-5 h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
+                    <motion.div
+                      className={`h-2 rounded-full ${brandGrad}`}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${fillPct}%` }}
+                      transition={{ duration: 0.9 }}
+                    />
+                  </div>
+                </>
+              )}
 
               <button
                 onClick={handleRegister}
@@ -254,32 +295,23 @@ export default function EventDetails() {
                 {spotsLeft === 0 ? "Event Full" : "Register Now"}
               </button>
 
-              {/* share */}
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => navigator.share?.({ title: event.title, url: window.location.href }) || navigator.clipboard.writeText(window.location.href)}
-                  className="rounded-lg border border-slate-700/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800/60"
-                >
-                  Share
-                </button>
-                <button
-                  onClick={() => navigate("/events")}
-                  className="rounded-lg border border-slate-700/60 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800/60"
-                >
-                  See more events
-                </button>
-              </div>
-
               {/* meta */}
               <div className="mt-6 space-y-2 text-sm text-slate-300">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-indigo-300" />
-                  <span>{event.date} • {event.time}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <LocationIcon className="h-4 w-4 text-indigo-300" />
-                  <span>{event.location}</span>
-                </div>
+                {(event.date || event.time) && (
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-indigo-300" />
+                    <span>
+                      {event.date}
+                      {event.time ? ` • ${event.time}` : ""}
+                    </span>
+                  </div>
+                )}
+                {event.location && (
+                  <div className="flex items-center gap-2">
+                    <LocationIcon className="h-4 w-4 text-indigo-300" />
+                    <span>{event.location}</span>
+                  </div>
+                )}
               </div>
             </div>
           </motion.aside>
