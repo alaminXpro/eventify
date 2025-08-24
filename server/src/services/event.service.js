@@ -5,11 +5,7 @@
  * @returns {Promise<Event>}
  */
 const updateEventStatusById = async (eventId, status) => {
-  const event = await Event.findByIdAndUpdate(
-    eventId,
-    { event_status: status, updated_at: new Date() },
-    { new: true }
-  );
+  const event = await Event.findByIdAndUpdate(eventId, { event_status: status, updated_at: new Date() }, { new: true });
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
@@ -96,11 +92,7 @@ const deleteEventById = async (eventId) => {
  * @returns {Promise<Event>}
  */
 const incrementEventView = async (eventId) => {
-  const event = await Event.findByIdAndUpdate(
-    eventId,
-    { $inc: { view: 1 } },
-    { new: true }
-  );
+  const event = await Event.findByIdAndUpdate(eventId, { $inc: { view: 1 } }, { new: true });
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
@@ -114,11 +106,7 @@ const incrementEventView = async (eventId) => {
  * @returns {Promise<Event>}
  */
 const updateEventRegistrations = async (eventId, increment = 1) => {
-  const event = await Event.findByIdAndUpdate(
-    eventId,
-    { $inc: { total_registrations: increment } },
-    { new: true }
-  );
+  const event = await Event.findByIdAndUpdate(eventId, { $inc: { total_registrations: increment } }, { new: true });
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
@@ -148,23 +136,23 @@ const getPublishedEvents = async (filter = {}, options) => {
 };
 
 // Event history operations
-const {StudentEventHistory} = require('../models/');
+const { StudentEventHistory } = require('../models/');
 /**
  * Register a student for an event
  * @param {ObjectId} userId
  * @param {ObjectId} eventId
  * @returns {Promise<StudentEventHistory>}
- */ 
+ */
 const registerEvent = async (userId, eventId) => {
   const event = await getEventById(eventId);
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
-  
+
   if (event.event_status !== 'published') {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot register for an unpublished or cancelled event');
   }
-  
+
   if (event.registration_deadline < new Date()) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Registration deadline has passed');
   }
@@ -183,23 +171,21 @@ const registerEvent = async (userId, eventId) => {
   if (recommendationExists) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Recommendation data already exists for this event');
   }
-  
+
   // Get user data with populated clubs and attended events
-  const user = await User.findById(userId)
-    .populate('clubs', 'name')
-    .populate('attendedEvents', 'title');
-    
+  const user = await User.findById(userId).populate('clubs', 'name').populate('attendedEvents', 'title');
+
   if (!user) {
     throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
   }
 
   // Get event with populated club hosting data
   const eventWithClub = await Event.findById(eventId).populate('club_hosting', 'name');
-  
+
   if (!eventWithClub.club_hosting) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Event must have a hosting club');
   }
-  
+
   // Prepare data for EventRecommendation
   const recommendationData = {
     user: userId,
@@ -212,8 +198,8 @@ const registerEvent = async (userId, eventId) => {
     category: eventWithClub.category,
     skills_offered: eventWithClub.skills_offered || [],
     registration_deadline: eventWithClub.registration_deadline,
-    joined_clubs: user.clubs ? user.clubs.map(club => club.name) : [],
-    previous_participation: user.attendedEvents ? user.attendedEvents.map(event => event.title) : [],
+    joined_clubs: user.clubs ? user.clubs.map((club) => club.name) : [],
+    previous_participation: user.attendedEvents ? user.attendedEvents.map((event) => event.title) : [],
     user_skills: user.skills || [],
     preferred_event_category: user.preferences?.preferredEventCategory || [],
     registered_at: new Date(),
@@ -230,16 +216,16 @@ const registerEvent = async (userId, eventId) => {
 
     // Create the recommendation record
     await EventRecommendation.create(recommendationData);
-    
+
     // Increment the event's registration count
     await updateEventRegistrations(eventId, 1);
-    
+
     return registration;
   } catch (error) {
     // If EventRecommendation creation fails, we should still allow registration
     // but log the error for debugging
     console.error('Failed to create EventRecommendation:', error);
-    
+
     // Create the registration record anyway
     const registration = await StudentEventHistory.create({
       user: userId,
@@ -247,10 +233,10 @@ const registerEvent = async (userId, eventId) => {
       status: 'registered',
       registered_at: new Date(),
     });
-    
+
     // Increment the event's registration count
     await updateEventRegistrations(eventId, 1);
-    
+
     return registration;
   }
 };
@@ -266,25 +252,25 @@ const unregisterEvent = async (userId, eventId) => {
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
-  
+
   const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
   if (!history) {
     throw new ApiError(httpStatus.NOT_FOUND, 'No registration found for this event');
   }
-  
+
   if (history.status !== 'registered') {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot unregister after attendance or feedback');
   }
-  
+
   if (event.event_date < new Date()) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot unregister after event date has passed');
   }
-  
+
   await history.deleteOne();
-  
+
   // Decrement the event's registration count
   await updateEventRegistrations(eventId, -1);
-  
+
   return { message: 'Successfully unregistered from event' };
 };
 
@@ -299,26 +285,24 @@ const attendEvent = async (userId, eventId) => {
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
-  
+
   const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
   if (!history) {
     throw new ApiError(httpStatus.NOT_FOUND, 'You are not registered for this event');
   }
-  
+
   if (history.status === 'attended' || history.status === 'feedback_given') {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Attendance already marked for this event');
   }
-  
+
   history.status = 'attended';
   await history.save();
-  
+
   // Increment the event's unique attendee count
-  await Event.findByIdAndUpdate(
-    eventId,
-    { $inc: { unique_attendees: 1 } },
-    { new: true }
-  );
-  
+  await Event.findByIdAndUpdate(eventId, { $inc: { unique_attendees: 1 } }, { new: true });
+  // Add event to user's attendedEvents array if not already present
+  await User.findByIdAndUpdate(userId, { $addToSet: { attendedEvents: eventId } }, { new: true });
+
   return history;
 };
 
@@ -334,43 +318,40 @@ const provideFeedback = async (userId, eventId, feedback_score) => {
   if (!event) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
   }
-  
+
   const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
   if (!history) {
     throw new ApiError(httpStatus.NOT_FOUND, 'You are not registered for this event');
   }
-  
+
   if (history.status !== 'attended') {
-    throw new ApiError(httpStatus.BAD_REQUEST, 
-      history.status === 'registered' 
-        ? 'You must attend the event before providing feedback' 
-        : 'Feedback already provided for this event'
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      history.status === 'registered'
+        ? 'You must attend the event before providing feedback'
+        : 'Feedback already provided for this event',
     );
   }
-  
+
   history.status = 'feedback_given';
   history.feedback_score = feedback_score;
   history.feedback_at = new Date();
   await history.save();
-  
+
   // Update the event's average feedback score
-  const allFeedbacks = await StudentEventHistory.find({ 
-    event: eventId, 
+  const allFeedbacks = await StudentEventHistory.find({
+    event: eventId,
     status: 'feedback_given',
-    feedback_score: { $exists: true }
+    feedback_score: { $exists: true },
   });
-  
+
   if (allFeedbacks.length > 0) {
     const totalScore = allFeedbacks.reduce((sum, item) => sum + item.feedback_score, 0);
     const averageScore = totalScore / allFeedbacks.length;
-    
-    await Event.findByIdAndUpdate(
-      eventId,
-      { feedback_score: parseFloat(averageScore.toFixed(1)) },
-      { new: true }
-    );
+
+    await Event.findByIdAndUpdate(eventId, { feedback_score: parseFloat(averageScore.toFixed(1)) }, { new: true });
   }
-  
+
   return history;
 };
 
