@@ -1,6 +1,8 @@
-import React from "react";
+// src/components/EventsShowcase.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import api from "../utils/axiosInstance";
 
 /* ---------- Icons ---------- */
 const CalendarIcon = (props) => (
@@ -14,14 +16,68 @@ const LocationIcon = (props) => (
   </svg>
 );
 
-/* ---------- Event Card ---------- */
+/* ---------- helpers ---------- */
+const now = () => Date.now();
+const toMonthDay = (isoOrDate) => {
+  const d = isoOrDate ? new Date(isoOrDate) : null;
+  if (!d || isNaN(d)) return { month: "", day: "" };
+  return {
+    month: d.toLocaleString(undefined, { month: "short" }).toUpperCase(),
+    day: String(d.getDate()).padStart(2, "0"),
+  };
+};
+const getStartDate = (e) =>
+  e?.event_date ||
+  e?.startsAt ||
+  e?.startAt ||
+  e?.start_time ||
+  e?.startTime ||
+  e?.start_date ||
+  e?.startDate ||
+  e?.date;
+
+const adaptEvent = (e) => {
+  const startsAt = getStartDate(e);
+  const startsAtMs = startsAt ? new Date(startsAt).getTime() : null;
+  const { month, day } = toMonthDay(startsAt);
+
+  const dateStr = startsAt
+    ? new Date(startsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : "";
+  const timeStr = startsAt
+    ? new Date(startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : "";
+
+  return {
+    id: e.id || e._id || e.event_id,
+    title: e.title || e.name || "Untitled Event",
+    image:
+      e.event_image ||
+      e.bannerUrl ||
+      e.banner_url ||
+      e.image ||
+      e.cover ||
+      "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60",
+    category: e.category || e.event_type || "General",
+    date: dateStr,
+    time: timeStr,
+    month,
+    day,
+    location: e.location || e.venue || "TBA",
+    maxCapacity: e.capacity ?? e.maxCapacity ?? e.max_capacity ?? 0,
+    registeredCount: e.registered ?? e.registeredCount ?? e.total_registrations ?? e.attendees_count ?? 0,
+    startsAtMs,
+    isPast: startsAtMs ? startsAtMs < now() : false,
+    _raw: e,
+  };
+};
+
+/* ---------- Card ---------- */
 const EventCard = ({ event, onRegister }) => {
-  const spotsLeft = event.maxCapacity - event.registeredCount;
-  const fillPercentage = Math.min(100, Math.max(0, (event.registeredCount / event.maxCapacity) * 100));
-
-  const statusTone =
-    spotsLeft === 0 ? "text-red-400" : spotsLeft <= 10 ? "text-orange-300" : "text-emerald-400";
-
+  const denom = Math.max(1, event.maxCapacity ?? 1);
+  const spotsLeft = Math.max(0, (event.maxCapacity ?? 0) - (event.registeredCount ?? 0));
+  const fillPercentage = Math.min(100, Math.max(0, ((event.registeredCount ?? 0) / denom) * 100));
+  const statusTone = spotsLeft === 0 ? "text-red-400" : spotsLeft <= 10 ? "text-orange-300" : "text-emerald-400";
   const brandGrad = "bg-gradient-to-r from-indigo-500 to-violet-500";
   const brandGradSoft = "bg-gradient-to-r from-indigo-400 to-violet-400";
 
@@ -32,44 +88,23 @@ const EventCard = ({ event, onRegister }) => {
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
     >
-      {/* sheen */}
       <span
         aria-hidden
         className="pointer-events-none absolute -inset-[1px] rounded-2xl opacity-0 blur-[2px] transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "linear-gradient(120deg,transparent,rgba(99,102,241,0.25),rgba(139,92,246,0.25),transparent)",
-        }}
+        style={{ background: "linear-gradient(120deg,transparent,rgba(99,102,241,0.25),rgba(139,92,246,0.25),transparent)" }}
       />
 
       <div className="relative h-44 overflow-hidden">
-        <motion.img
-          src={event.image}
-          alt=""
-          className="h-full w-full object-cover"
-          whileHover={{ scale: 1.07 }}
-          transition={{ duration: 0.4 }}
-          loading="lazy"
-        />
+        <motion.img src={event.image} alt="" className="h-full w-full object-cover" whileHover={{ scale: 1.07 }} transition={{ duration: 0.4 }} loading="lazy" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent" />
 
-        {/* category */}
         <div className="absolute left-3 top-3">
-          <motion.span
-            className={`rounded-md ${brandGrad} px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur`}
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.span className={`rounded-md ${brandGrad} px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur`} whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
             {event.category}
           </motion.span>
         </div>
 
-        {/* date pill */}
-        <motion.div
-          className="absolute right-3 top-3 rounded-lg bg-white/90 p-2 text-center shadow-sm backdrop-blur"
-          whileHover={{ scale: 1.05 }}
-          transition={{ duration: 0.2 }}
-        >
+        <motion.div className="absolute right-3 top-3 rounded-lg bg-white/90 p-2 text-center shadow-sm backdrop-blur" whileHover={{ scale: 1.05 }} transition={{ duration: 0.2 }}>
           <div className="text-[10px] font-semibold leading-3 text-slate-600">{event.month}</div>
           <div className="text-sm font-black text-slate-900">{event.day}</div>
         </motion.div>
@@ -83,9 +118,7 @@ const EventCard = ({ event, onRegister }) => {
         <div className="mb-3 flex-1 space-y-1">
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <CalendarIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
-            <span className="truncate">
-              {event.date} • {event.time}
-            </span>
+            <span className="truncate">{event.date} • {event.time}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <LocationIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
@@ -93,12 +126,11 @@ const EventCard = ({ event, onRegister }) => {
           </div>
         </div>
 
-        {/* capacity */}
         <div className="mb-3">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">Spots</span>
             <span className={`text-xs font-semibold ${statusTone}`}>
-              {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
+              {event.maxCapacity ? (spotsLeft > 0 ? `${spotsLeft} left` : "Full") : "—"}
             </span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/50">
@@ -111,13 +143,10 @@ const EventCard = ({ event, onRegister }) => {
           </div>
         </div>
 
-        {/* CTA */}
         <motion.button
           onClick={() => onRegister?.(event)}
           className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-            spotsLeft === 0
-              ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
-              : `${brandGrad} text-white hover:from-indigo-400 hover:to-violet-500`
+            spotsLeft === 0 ? "cursor-not-allowed bg-slate-700/60 text-slate-500" : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-400 hover:to-violet-500"
           }`}
           disabled={spotsLeft === 0}
           whileHover={spotsLeft > 0 ? { scale: 1.02 } : {}}
@@ -130,73 +159,85 @@ const EventCard = ({ event, onRegister }) => {
   );
 };
 
-/* ---------- Showcase Section ---------- */
-const EventsShowcase = () => {
-  // sample demo data
-  const featuredEvents = [
-    {
-      id: 101,
-      title: "Campus Hackathon 2025",
-      image:
-        "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=1200&auto=format&fit=crop&q=60",
-      category: "Hackathon",
-      date: "May 10, 2025",
-      time: "9:00 AM",
-      month: "MAY",
-      day: "10",
-      location: "Innovation Lab",
-      maxCapacity: 300,
-      registeredCount: 248,
-    },
-    {
-      id: 102,
-      title: "Inter-University Programming Contest",
-      image:
-        "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=60",
-      category: "Programming",
-      date: "Jun 2, 2025",
-      time: "10:00 AM",
-      month: "JUN",
-      day: "02",
-      location: "Computer Science Building",
-      maxCapacity: 200,
-      registeredCount: 172,
-    },
-    {
-      id: 1,
-      title: "Tech Innovation Summit 2024",
-      image:
-        "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60",
-      category: "Technology",
-      date: "Mar 15, 2024",
-      time: "9:00 AM",
-      month: "MAR",
-      day: "15",
-      location: "Main Auditorium",
-      maxCapacity: 200,
-      registeredCount: 156,
-    },
-    {
-      id: 2,
-      title: "Cultural Night: Around the World",
-      image:
-        "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&auto=format&fit=crop&q=60",
-      category: "Cultural",
-      date: "Mar 22, 2024",
-      time: "6:00 PM",
-      month: "MAR",
-      day: "22",
-      location: "Student Center",
-      maxCapacity: 150,
-      registeredCount: 89,
-    },
-  ];
+/* ---------- Skeleton ---------- */
+const Skeleton = () => (
+  <div className="relative w-[320px] flex-shrink-0 overflow-hidden rounded-2xl border border-slate-800/50 bg-slate-900/60">
+    <div className="h-44 w-full bg-slate-800/60" />
+    <div className="space-y-3 p-4">
+      <div className="h-5 w-3/4 rounded bg-slate-800/60" />
+      <div className="h-4 w-2/3 rounded bg-slate-800/60" />
+      <div className="h-4 w-1/2 rounded bg-slate-800/60" />
+      <div className="h-2 w-full rounded bg-slate-800/60" />
+      <div className="h-9 w-full rounded-xl bg-slate-800/60" />
+    </div>
+    <div className="pointer-events-none absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+    <style>{`@keyframes shimmer{100%{transform:translateX(100%)}}`}</style>
+  </div>
+);
 
-  const handleRegister = (event) => console.log("Register clicked for:", event.title);
+/* ---------- Showcase (only upcoming) ---------- */
+const EventsShowcase = () => {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  const DISPLAY_LIMIT = 12;
+
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+
+    (async () => {
+      setLoading(true);
+      setErr("");
+      try {
+        const res = await api.get("/events/published", {
+          params: { page: 1, limit: DISPLAY_LIMIT * 2, sortBy: "created_at:desc" },
+          signal: controller.signal,
+        });
+
+        let items = [];
+        const payload = res?.data;
+        if (payload && typeof payload === "object") {
+          if (Array.isArray(payload.results)) items = payload.results;
+          else if (Array.isArray(payload.items)) items = payload.items;
+          else if (Array.isArray(payload.data)) items = payload.data;
+        } else if (Array.isArray(payload)) items = payload;
+
+        const adapted = items.map(adaptEvent).filter((e) => e.id);
+        if (!ignore) setRows(adapted);
+      } catch (e) {
+        if (!ignore && e?.name !== "CanceledError" && e?.name !== "AbortError") {
+          setErr("Couldn't load events.");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    })();
+
+    return () => { ignore = true; controller.abort(); };
+  }, []);
+
+  // Only upcoming (not over) + sort by soonest
+  const upcoming = useMemo(() => {
+    return rows
+      .filter((e) => !e.isPast)
+      .sort((a, b) => {
+        if (a.startsAtMs && b.startsAtMs) return a.startsAtMs - b.startsAtMs;
+        if (a.startsAtMs) return -1;
+        if (b.startsAtMs) return 1;
+        return 0;
+      })
+      .slice(0, DISPLAY_LIMIT);
+  }, [rows]);
+
+  // duplicate list for seamless marquee
+  const marqueeItems = useMemo(() => (upcoming.length ? upcoming.concat(upcoming) : []), [upcoming]);
+
+  const handleRegister = () => {};
 
   return (
     <section className="relative overflow-hidden bg-[#0b1220] py-16">
-      {/* bg glows */}
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute inset-0 opacity-20"
@@ -208,41 +249,36 @@ const EventsShowcase = () => {
       </div>
 
       <div className="container relative mx-auto max-w-7xl px-6">
-        <motion.div
-          className="mb-12 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div className="mb-12 text-center" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <p className="mb-2 bg-gradient-to-r from-indigo-300/90 to-violet-300/90 bg-clip-text text-sm font-semibold uppercase tracking-wider text-transparent">
             Featured Events
           </p>
           <h2 className="text-4xl font-black text-white md:text-5xl">
-            Upcoming{" "}
-            <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-              Events
-            </span>
+            Upcoming <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Events</span>
           </h2>
         </motion.div>
 
-        {/* marquee */}
         <div
           className="marquee group relative w-full overflow-hidden"
           style={{
-            WebkitMaskImage:
-              "linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%)",
-            maskImage:
-              "linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%)",
+            maskImage: "linear-gradient(to right, transparent 0, black 6%, black 94%, transparent 100%)",
           }}
         >
           <div className="track flex gap-6 will-change-transform">
-            {featuredEvents.concat(featuredEvents).map((e, i) => (
-              <div key={`${e.id}-${i}`} className="w-[320px] flex-shrink-0">
-                {/* 👇 now clickable */}
-                <Link to={`/events/${e.id}`} state={{ event: e }}>
-                  <EventCard event={e} onRegister={handleRegister} />
-                </Link>
-              </div>
-            ))}
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => <Skeleton key={`sk-${i}`} />)
+              : err
+              ? <div className="text-slate-300">{err}</div>
+              : marqueeItems.length === 0
+              ? <div className="rounded-xl border border-slate-800/60 bg-slate-900/60 px-4 py-3 text-slate-300">No upcoming events.</div>
+              : marqueeItems.map((e, i) => (
+                  <div key={`${e.id}-${i}`} className="w-[320px] flex-shrink-0">
+                    <Link to={`/events/${e.id}`} state={{ event: e }}>
+                      <EventCard event={e} onRegister={handleRegister} />
+                    </Link>
+                  </div>
+                ))}
           </div>
         </div>
       </div>
