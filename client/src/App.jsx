@@ -14,7 +14,7 @@ import EventCreate from "./pages/EventCreate";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
-
+import EventFAQPage from "./pages/FAQ";
 // Clubs
 import JoinClub from "./pages/JoinClub";
 import MyClubs from "./pages/MyClubs";
@@ -37,7 +37,7 @@ function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/events/create" element={<EventCreate />} />
         <Route path="/events/:id" element={<EventDetails />} />
-
+        <Route path="/faq" element={<EventFAQPage />} />
         {/* Student */}
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
