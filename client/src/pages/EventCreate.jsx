@@ -1,8 +1,9 @@
 // src/pages/EventCreate.jsx
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import axios from "axios";
+import PropTypes from "prop-types";
+import axiosInstance from "../utils/axiosInstance";
 import {
   BookmarkPlus,
   Sparkles,
@@ -15,20 +16,80 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-/** If you expose SKILLS_ENUM to the client, import it and replace this. */
+/** If you expose SKILLS_ENUM to the client, import it and                  {clubs.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name}
+                    </option>
+                  ))}ace this. */
 const SKILLS_ENUM_FALLBACK = [
-  "Leadership",
-  "Teamwork",
-  "Communication",
+  // Technical
+  "Programming",
+  "Web Development",
+  "App Development",
+  "Machine Learning",
+  "Artificial Intelligence",
+  "Data Science",
+  "Cybersecurity",
+  "Cloud Computing",
+  "IoT",
+  "Robotics",
+  "Blockchain",
+  "Game Development",
+  "UI/UX Design",
+  "Database Management",
+  "Version Control",
+
+  // Professional & Career
   "Public Speaking",
-  "JavaScript",
-  "Python",
-  "UI/UX",
-  "Data Analysis",
-  "Marketing",
+  "Leadership",
+  "Team Management",
+  "Networking",
+  "Critical Thinking",
+  "Time Management",
   "Project Management",
-  "Finance",
-  "Legal Research",
+  "Resume Writing",
+  "Interview Preparation",
+  "Career Planning",
+
+  // Creative & Cultural
+  "Graphic Design",
+  "Video Editing",
+  "Photography",
+  "Creative Writing",
+  "Content Creation",
+  "Event Management",
+  "Drama",
+  "Music",
+  "Dance",
+  "Debate",
+  "Anchoring",
+
+  // Entrepreneurship & Business
+  "Entrepreneurship",
+  "Startup Pitching",
+  "Marketing",
+  "Social Media Marketing",
+  "Finance Basics",
+  "Business Strategy",
+  "Negotiation",
+
+  // Sports & Wellness
+  "Football",
+  "Cricket",
+  "Basketball",
+  "Fitness Training",
+  "Yoga",
+  "Meditation",
+  "Stress Management",
+  "Nutrition",
+
+  // Social & Community
+  "Volunteering",
+  "Fundraising",
+  "Social Impact",
+  "Environmental Awareness",
+  "Diversity & Inclusion",
+  "Community Building"
 ];
 
 const CATEGORIES = [
@@ -44,7 +105,6 @@ const CATEGORIES = [
 ];
 
 const EVENT_TYPES = ["online", "offline", "hybrid"];
-const EVENT_STATUS = ["unpublished", "published", "cancelled"];
 
 /* ----------------------------- Small UI Pieces ---------------------------- */
 function Chip({ selected, onClick, children }) {
@@ -59,6 +119,12 @@ function Chip({ selected, onClick, children }) {
     </button>
   );
 }
+
+Chip.propTypes = {
+  selected: PropTypes.bool.isRequired,
+  onClick: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+};
 
 function TagInput({ value, onChange, placeholder = "Type and press Enter" }) {
   const [draft, setDraft] = useState("");
@@ -76,6 +142,7 @@ function TagInput({ value, onChange, placeholder = "Type and press Enter" }) {
     onChange(next);
   };
 
+  
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-2">
@@ -116,18 +183,35 @@ function TagInput({ value, onChange, placeholder = "Type and press Enter" }) {
   );
 }
 
+TagInput.propTypes = {
+  value: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+};
+
 /* ---------------------------------- Page --------------------------------- */
 export default function EventCreate() {
   const navigate = useNavigate();
-  const API_BASE = import.meta.env.VITE_API_BASE;
+  const [userId] = useState(() => {
+    try {
+      const persistedState = localStorage.getItem('persist:root');
+      if (!persistedState) return null;
 
+      const parsedState = JSON.parse(persistedState);
+      const userState = JSON.parse(parsedState.user);
+
+      return userState.currentUser?.id || null;
+    } catch (err) {
+      console.error("Failed to parse userId from localStorage:", err);
+      return null;
+    }
+  });
   // Form state mapped 1:1 with your schema (names matter!)
   const [form, setForm] = useState({
     title: "",
     event_description: "",
     category: "",
     club_hosting: "",
-    event_status: "unpublished",
     event_date: "",
     event_time_duration: "", // string (e.g. "10:00 - 12:00 (120m)")
     registration_deadline: "",
@@ -145,16 +229,33 @@ export default function EventCreate() {
 
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [clubs, setClubs] = useState([]);
+  const [loadingClubs, setLoadingClubs] = useState(true);
 
-  // Replace with API fetch if you have Clubs endpoint
-  const clubs = useMemo(
-    () => [
-      { _id: "c1", name: "Tech Society" },
-      { _id: "c2", name: "Business Club" },
-      { _id: "c3", name: "Design Circle" },
-    ],
-    []
-  );
+  // Fetch clubs on component mount
+  useEffect(() => {
+    const fetchClubs = async () => {
+      try {
+        setLoadingClubs(true);
+        const response = await axiosInstance.get('/clubs', {
+          params: { limit: 100 } // Get up to 100 clubs
+        });
+        const allClubs = response.data.results || []
+        const myModeratorClubs = allClubs.filter(club =>
+          club.moderators.some(moderatorId => moderatorId === userId)
+        );
+
+        setClubs(myModeratorClubs);
+      } catch (error) {
+        console.error('Failed to fetch clubs:', error);
+        setErrors(prev => ({ ...prev, clubs: 'Failed to load clubs' }));
+      } finally {
+        setLoadingClubs(false);
+      }
+    };
+
+    fetchClubs();
+  }, []);
 
   const skillsList = SKILLS_ENUM_FALLBACK;
 
@@ -189,13 +290,16 @@ export default function EventCreate() {
     if (!form.title.trim()) e.title = "Title is required";
     if (!form.event_description.trim()) e.event_description = "Description is required";
     if (!form.category) e.category = "Select a category";
-    if (!form.club_hosting) e.club_hosting = "Select a host club";
-    if (!form.event_status) e.event_status = "Select a status";
+    if (!form.club_hosting) {
+      e.club_hosting = "Select a host club";
+    } else if (!/^[0-9a-fA-F]{24}$/.test(form.club_hosting)) {
+      e.club_hosting = "Invalid club ID format";
+    }
     if (!form.event_date) e.event_date = "Pick a date";
     if (!form.event_time_duration.trim()) e.event_time_duration = "Add time/duration info";
     if (!form.registration_deadline) e.registration_deadline = "Pick a registration deadline";
     if (!form.location.trim()) e.location = "Location is required";
-    if (form.capacity === "" || Number(form.capacity) < 0) e.capacity = "Capacity must be ≥ 0";
+    if (form.capacity === "" || Number(form.capacity) < 1) e.capacity = "Capacity must be ≥ 1";
     if (!form.event_type) e.event_type = "Choose an event format";
     if (!eventImageFile) e.event_image = "Event image is required";
     setErrors(e);
@@ -208,23 +312,35 @@ export default function EventCreate() {
 
     setSubmitting(true);
     try {
-      const fd = new FormData();
-      // Append scalar + array fields
-      Object.entries(form).forEach(([k, v]) => {
-        if (Array.isArray(v)) {
-          v.forEach((item) => fd.append(k, item));
-        } else {
-          fd.append(k, v);
-        }
-      });
+      // Since the server expects event_image as a URL string, we'll use a placeholder
+      // In a real implementation, you would upload the image to cloudinary first
+      // and get the URL, then use that URL
+      const imageUrl = eventImageFile 
+        ? "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60" 
+        : "";
 
-      // Append the file with the exact field name from schema: event_image
-      fd.append("event_image", eventImageFile);
+      // Prepare event data according to server validation schema
+      const eventData = {
+        title: form.title,
+        event_description: form.event_description,
+        category: form.category,
+        event_image: imageUrl,
+        club_hosting: form.club_hosting,
+        event_date: form.event_date,
+        event_time_duration: form.event_time_duration,
+        registration_deadline: form.registration_deadline,
+        location: form.location,
+        capacity: parseInt(form.capacity) || 1,
+        event_type: form.event_type,
+        skills_offered: form.skills_offered,
+        topics: form.topics,
+        media_links: form.media_links,
+        // event_status is not included - server will default to 'unpublished'
+      };
 
-      const res = await axios.post(`${API_BASE}/events`, fd, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      console.log('Submitting event data:', eventData); // Debug log to verify data
+      
+      const res = await axiosInstance.post('/events', eventData);
 
       navigate(`/events/${res.data._id || res.data.id}`, { state: { event: res.data } });
     } catch (err) {
@@ -325,8 +441,8 @@ export default function EventCreate() {
               )}
             </div>
 
-            {/* Category / Club / Status */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {/* Category / Club */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold">Category *</label>
                 <select
@@ -337,8 +453,8 @@ export default function EventCreate() {
                   }`}
                 >
                   <option value="">Select</option>
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
+                  {CATEGORIES.map((c, index) => (
+                    <option key={`category-${index}-${c}`} value={c}>
                       {c}
                     </option>
                   ))}
@@ -351,39 +467,25 @@ export default function EventCreate() {
                 <select
                   value={form.club_hosting}
                   onChange={(e) => setField("club_hosting", e.target.value)}
-                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 ${
+                  disabled={loadingClubs}
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed ${
                     errors.club_hosting ? "border-rose-500" : "border-slate-700/60"
                   }`}
                 >
-                  <option value="">Select</option>
+                  <option value="">
+                    {loadingClubs ? "Loading clubs..." : "Select a club"}
+                  </option>
                   {clubs.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
+                    <option key={c.id} value={c.id}>
+                      {c.name} 
                     </option>
                   ))}
                 </select>
                 {errors.club_hosting && (
                   <p className="mt-1 text-xs text-rose-400">{errors.club_hosting}</p>
                 )}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold">Status *</label>
-                <select
-                  value={form.event_status}
-                  onChange={(e) => setField("event_status", e.target.value)}
-                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 ${
-                    errors.event_status ? "border-rose-500" : "border-slate-700/60"
-                  }`}
-                >
-                  {EVENT_STATUS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-                {errors.event_status && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.event_status}</p>
+                {errors.clubs && (
+                  <p className="mt-1 text-xs text-rose-400">{errors.clubs}</p>
                 )}
               </div>
             </div>
@@ -471,7 +573,7 @@ export default function EventCreate() {
                 </label>
                 <input
                   type="number"
-                  min="0"
+                  min="1"
                   value={form.capacity}
                   onChange={(e) => setField("capacity", e.target.value)}
                   className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 ${
@@ -488,9 +590,9 @@ export default function EventCreate() {
             <div>
               <label className="mb-1 block text-sm font-semibold">Event Type *</label>
               <div className="flex flex-wrap gap-2">
-                {EVENT_TYPES.map((t) => (
+                {EVENT_TYPES.map((t, index) => (
                   <Chip
-                    key={t}
+                    key={`event-type-${index}-${t}`}
                     selected={form.event_type === t}
                     onClick={() => setField("event_type", t)}
                   >
@@ -506,16 +608,70 @@ export default function EventCreate() {
             {/* Skills Offered */}
             <div>
               <label className="mb-2 block text-sm font-semibold">Skills Offered</label>
-              <div className="flex flex-wrap gap-2">
-                {skillsList.map((s) => (
-                  <Chip
-                    key={s}
-                    selected={form.skills_offered.includes(s)}
-                    onClick={() => toggleSkill(s)}
-                  >
-                    {s}
-                  </Chip>
-                ))}
+              <div className="space-y-3">
+                {/* Technical Skills */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Technical</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {skillsList.slice(0, 16).map((s, index) => (
+                      <Chip
+                        key={`skill-${index}-${s}`}
+                        selected={form.skills_offered.includes(s)}
+                        onClick={() => toggleSkill(s)}
+                      >
+                        {s}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Professional & Career */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Professional & Career</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {skillsList.slice(16, 26).map((s, index) => (
+                      <Chip
+                        key={`skill-${index + 16}-${s}`}
+                        selected={form.skills_offered.includes(s)}
+                        onClick={() => toggleSkill(s)}
+                      >
+                        {s}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Creative & Cultural */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Creative & Cultural</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {skillsList.slice(26, 37).map((s, index) => (
+                      <Chip
+                        key={`skill-${index + 26}-${s}`}
+                        selected={form.skills_offered.includes(s)}
+                        onClick={() => toggleSkill(s)}
+                      >
+                        {s}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Business & Other */}
+                <div>
+                  <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Business & Others</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {skillsList.slice(37).map((s, index) => (
+                      <Chip
+                        key={`skill-${index + 37}-${s}`}
+                        selected={form.skills_offered.includes(s)}
+                        onClick={() => toggleSkill(s)}
+                      >
+                        {s}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -557,10 +713,10 @@ export default function EventCreate() {
               </button>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || loadingClubs}
                 className="rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600 disabled:opacity-60"
               >
-                {submitting ? "Creating..." : "Create Event"}
+                {submitting ? "Creating..." : loadingClubs ? "Loading..." : "Create Event"}
               </button>
             </div>
           </motion.form>
@@ -602,12 +758,25 @@ export default function EventCreate() {
                     <Users className="h-4 w-4 text-indigo-300" />
                     <span>{form.capacity || 0} capacity</span>
                   </div>
+                  {form.club_hosting && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-indigo-300">🏛️</span>
+                      <span>{clubs.find(c => c.id === form.club_hosting)?.name || "Selected Club"}</span>
+                    </div>
+                  )}
                 </div>
                 {(form.category || form.event_type) && (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-indigo-500 to-violet-500 px-2 py-1 text-xs font-semibold text-white">
-                    {form.category || "Category"}
-                    <span className="opacity-80">•</span>
-                    {form.event_type}
+                  <div className="mt-3 space-y-1">
+                    <div className="inline-flex items-center gap-2 rounded-md bg-gradient-to-r from-indigo-500 to-violet-500 px-2 py-1 text-xs font-semibold text-white">
+                      {form.category || "Category"}
+                      <span className="opacity-80">•</span>
+                      {form.event_type}
+                    </div>
+                    <div className="block">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-yellow-600/20 border border-yellow-600/30 px-2 py-1 text-xs font-medium text-yellow-200">
+                        📝 Will be created as &ldquo;unpublished&rdquo;
+                      </span>
+                    </div>
                   </div>
                 )}
                 {form.event_description && (
@@ -617,9 +786,9 @@ export default function EventCreate() {
                 )}
                 {form.skills_offered.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {form.skills_offered.slice(0, 5).map((s) => (
+                    {form.skills_offered.slice(0, 5).map((s, index) => (
                       <span
-                        key={s}
+                        key={`preview-skill-${index}-${s}`}
                         className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px]"
                       >
                         <CheckCircle2 className="h-3 w-3 text-emerald-400" />
@@ -703,3 +872,9 @@ function SmallListEditor({ value, onChange, placeholder }) {
     </div>
   );
 }
+
+SmallListEditor.propTypes = {
+  value: PropTypes.arrayOf(PropTypes.string),
+  onChange: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+};

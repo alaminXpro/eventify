@@ -176,13 +176,6 @@ export default function StudentDashboard() {
 
     try {
       // TODO: BACKEND — unregister endpoint
-      // const res = await fetch(`${API_BASE}/events/${eventId}/registration`, {
-      //   method: "DELETE",
-      //   credentials: "include",
-      // });
-      // if (!res.ok) {
-      //   throw new Error((await res.json())?.message || "Failed to unregister");
-      // }
     } catch (err) {
       // revert on error
       setMyEvents(prev);
