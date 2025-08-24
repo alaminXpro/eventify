@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import api from "../utils/axiosInstance";
 import {
   CalendarDays,
   Search,
@@ -18,117 +19,235 @@ import {
   Loader2,
 } from "lucide-react";
 
+/* ---------- helpers ---------- */
+const fromMongoId = (id) => (id && typeof id === "object" && id.$oid ? id.$oid : id);
+const fromMongoDate = (d) => {
+  if (!d) return null;
+  if (d instanceof Date) return d;
+  if (typeof d === "string" || typeof d === "number") return new Date(d);
+  if (typeof d === "object" && d.$date) return new Date(d.$date);
+  return null;
+};
 
+// Accepts each item from /events/user/:userId/history
+const adaptHistoryItem = (h, eventMap) => {
+  // h.event may be: ObjectId string | {_id,...} | populated or not
+  const evRaw = typeof h?.event === "string" || typeof h?.event === "object" && !h?.event?.title
+    ? eventMap.get(String(fromMongoId(h?.event))) || {}        // enrich from fetched map
+    : (h?.event || {});                                        // already populated
+
+  const id = fromMongoId(evRaw?._id) || evRaw?.id || evRaw?.event_id || fromMongoId(h?.event) || h?.eventId || h?.id;
+
+  const startsAt =
+    fromMongoDate(evRaw?.event_date) ||
+    fromMongoDate(evRaw?.startsAt) ||
+    fromMongoDate(evRaw?.start_time) ||
+    fromMongoDate(h?.date);
+
+  return {
+    id,
+    title: evRaw?.title || evRaw?.name || h?.title || "Untitled Event",
+    date: startsAt ? startsAt.toISOString() : undefined,
+    location: evRaw?.location || evRaw?.venue || h?.location || "",
+    status: (h?.status || evRaw?.status || "registered").toLowerCase(),
+    cover:
+      evRaw?.event_image ||
+      evRaw?.bannerUrl ||
+      evRaw?.image ||
+      "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&auto=format&fit=crop&q=60",
+  };
+};
+
+/* ---------- component ---------- */
 export default function StudentDashboard() {
-  const API_BASE = import.meta.env.VITE_API_BASE; // e.g., http://localhost:3000/v1
+  // current user (same pattern as other pages)
+  const currentUser = (() => {
+    try {
+      const persisted = localStorage.getItem("persist:root");
+      if (persisted) {
+        const parsed = JSON.parse(persisted);
+        const userSlice = JSON.parse(parsed.user || "{}");
+        return userSlice?.currentUser || userSlice?.user || null;
+      }
+      const direct = localStorage.getItem("currentUser");
+      return direct ? JSON.parse(direct) : null;
+    } catch {
+      return null;
+    }
+  })();
 
-  // Replace with Redux or your auth context: useSelector((s) => s.user.user)
-  const [user] = useState({
-    name: "Alex Student",
-    email: "alex@student.edu",
-  });
+  const userId = currentUser?._id || currentUser?.id || null;
+  const userName = currentUser?.name || "Student";
 
   // UI state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all"); // all | registered | waitlist | attended | cancelled | pending
-  const [sortBy, setSortBy] = useState("upcoming"); // upcoming | recent | az
+  const [sortBy, setSortBy] = useState("upcoming");        // upcoming | recent | az
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  // Data state
+  // data & pagination
   const PAGE_SIZE = 9;
   const [page, setPage] = useState(1);
-  const [myEvents, setMyEvents] = useState([]);
+  const [rawRows, setRawRows] = useState([]);     // history rows as returned by backend (accumulated)
+  const [eventCache, setEventCache] = useState(new Map()); // id -> event doc (client-fetched)
+  const [hasMore, setHasMore] = useState(true);
 
-  // Demo seed (remove when wired)
-  const DEMO = useMemo(
-    () => [
-      {
-        id: "e1",
-        title: "Annual Sports Tournament",
-        date: "2026-04-12T08:00:00Z",
-        location: "Sports Complex",
-        status: "registered",
-        cover:
-          "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&auto=format&fit=crop&q=60",
-      },
-      {
-        id: "e2",
-        title: "Tech Innovation Summit",
-        date: "2026-03-15T09:00:00Z",
-        location: "Main Auditorium",
-        status: "attended",
-        cover:
-          "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60",
-      },
-      {
-        id: "e3",
-        title: "Startup Pitch Night",
-        date: "2026-03-28T14:00:00Z",
-        location: "Business Hall",
-        status: "waitlist",
-        cover:
-          "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop&q=60",
-      },
-      {
-        id: "e4",
-        title: "Green Campus Workshop",
-        date: "2026-05-05T10:00:00Z",
-        location: "Science Building",
-        status: "registered",
-        cover:
-          "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1200&auto=format&fit=crop&q=60",
-      },
-      {
-        id: "e5",
-        title: "Art & Design Exhibition",
-        date: "2026-04-18T15:00:00Z",
-        location: "Art Gallery",
-        status: "cancelled",
-        cover:
-          "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1200&auto=format&fit=crop&q=60",
-      },
-    ],
-    []
+  // fetch a page of history
+  const fetchHistory = useCallback(
+    async ({ reset = false } = {}) => {
+      if (!userId) {
+        setLoading(false);
+        setRawRows([]);
+        setHasMore(false);
+        return;
+      }
+
+      const thisPage = reset ? 1 : page;
+      if (reset) { setLoading(true); setError(""); } else { setLoadingMore(true); }
+
+      try {
+        const params = {
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          page: thisPage,
+          limit: PAGE_SIZE,
+          title: search.trim() || undefined, // backend may ignore; we filter again client-side
+        };
+
+        const res = await api.get(`/events/user/${userId}/history`, { params });
+        const payload = res?.data;
+
+        const list = Array.isArray(payload?.results)
+          ? payload.results
+          : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload)
+          ? payload
+          : [];
+
+        // accumulate raw rows
+        setRawRows((prev) => (reset ? list : [...prev, ...list]));
+
+        // compute hasMore using any hint the backend gives
+        const total =
+          payload?.totalResults ??
+          payload?.total ??
+          payload?.pagination?.total ??
+          undefined;
+        const explicitHasMore =
+          payload?.pagination?.hasMore ??
+          payload?.hasMore ??
+          undefined;
+
+        if (typeof explicitHasMore === "boolean") {
+          setHasMore(explicitHasMore);
+        } else if (typeof total === "number") {
+          const countSoFar = (reset ? 0 : prevCount(prev => prev)) + list.length;
+          setHasMore(countSoFar < total);
+        } else {
+          setHasMore(list.length === PAGE_SIZE);
+        }
+
+        // helper to read prev length in closure safely
+        function prevCount(getPrev) { return getPrev ? getPrev.length : (reset ? 0 : rawRows.length); }
+      } catch (e) {
+        if (e?.name !== "CanceledError" && e?.name !== "AbortError") {
+          setError("Couldn't load your events. Please try again.");
+        }
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [userId, page, statusFilter, search, rawRows.length]
   );
 
-  // Initial fetch
+  // when filters/search change -> reset to page 1 and refetch
   useEffect(() => {
-    setLoading(true);
-    setError("");
+    setPage(1);
+    fetchHistory({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, statusFilter, search]);
 
-    // TODO: BACKEND — fetch the student's registered events
+  // load next page
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMore) return;
+    setPage((p) => p + 1);
+  }, [hasMore, loadingMore]);
 
-    // Demo:
-    const t = setTimeout(() => {
-      setMyEvents(DEMO);
-      setLoading(false);
-    }, 500);
-    return () => clearTimeout(t);
-  }, [API_BASE, DEMO]);
+  useEffect(() => {
+    if (page > 1) fetchHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
-  // Derived: stats
+  // After rawRows change, fetch any missing event docs (when backend didn't populate)
+  useEffect(() => {
+    // Gather event IDs that are strings/ObjectIds and not in cache yet
+    const needed = new Set();
+    for (const r of rawRows) {
+      const ev = r?.event;
+      const id = fromMongoId(typeof ev === "object" ? ev?._id : ev);
+      const isPopulated = ev && typeof ev === "object" && (ev.title || ev.name);
+      if (id && !isPopulated && !eventCache.has(String(id))) {
+        needed.add(String(id));
+      }
+    }
+    if (needed.size === 0) return;
+
+    let ignore = false;
+    (async () => {
+      try {
+        const fetches = Array.from(needed).map(async (id) => {
+          try {
+            const { data } = await api.get(`/events/${id}`);
+            return [id, data];
+          } catch {
+            return [id, null]; // keep placeholder to avoid refetch loop
+          }
+        });
+        const pairs = await Promise.all(fetches);
+        if (ignore) return;
+        setEventCache((prev) => {
+          const next = new Map(prev);
+          for (const [id, doc] of pairs) next.set(id, doc);
+          return next;
+        });
+      } catch {
+        // ignore; UI will still show row with fallback text
+      }
+    })();
+
+    return () => { ignore = true; };
+  }, [rawRows, eventCache]);
+
+  // Adapt rows -> cards with eventMap enrichment
+  const adapted = useMemo(() => {
+    const map = eventCache;
+    return rawRows.map((h) => adaptHistoryItem(h, map)).filter((e) => e.id);
+  }, [rawRows, eventCache]);
+
+  // Stats from adapted items
   const stats = useMemo(() => {
     const now = Date.now();
-    const total = myEvents.length;
-    const attended = myEvents.filter((e) => (e.status || "").toLowerCase() === "attended").length;
-    const upcoming = myEvents.filter((e) => new Date(e.date).getTime() > now).length;
+    const total = adapted.length;
+    const attended = adapted.filter((e) => (e.status || "").toLowerCase() === "attended").length;
+    const upcoming = adapted.filter((e) => (e.date ? new Date(e.date).getTime() > now : false)).length;
     return { total, attended, upcoming };
-  }, [myEvents]);
+  }, [adapted]);
 
-  // Filter + sort
+  // Client-side refine (in case backend ignored title/status)
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = myEvents.filter((e) => {
+    let list = adapted.filter((e) => {
       const matchesQ =
         !q ||
         e.title.toLowerCase().includes(q) ||
         (e.location || "").toLowerCase().includes(q) ||
         (e.status || "").toLowerCase().includes(q);
-      const matchesStatus =
-        statusFilter === "all" || (e.status || "").toLowerCase() === statusFilter;
+      const matchesStatus = statusFilter === "all" || (e.status || "").toLowerCase() === statusFilter;
       return matchesQ && matchesStatus;
     });
 
@@ -138,48 +257,30 @@ export default function StudentDashboard() {
         break;
       case "recent":
         list = [...list].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
         );
         break;
-      default: // upcoming first
+      default: // upcoming
         list = [...list].sort(
-          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+          (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
         );
     }
-
     return list;
-  }, [myEvents, search, statusFilter, sortBy]);
+  }, [adapted, search, statusFilter, sortBy]);
 
-  const visible = filtered.slice(0, page * PAGE_SIZE);
-  const hasMore = visible.length < filtered.length;
-
-  const loadMore = useCallback(() => {
-    if (!hasMore) return;
-    setLoadingMore(true);
-    // If you page from backend, call it here and append results instead:
-    // TODO: BACKEND — pagination
-    // fetch(`${API_BASE}/students/me/events?limit=${PAGE_SIZE}&page=${page + 1}`, { credentials: "include" })
-    //   .then(r => r.json())
-    //   .then(data => setMyEvents(prev => [...prev, ...(data.items ?? data)]))
-    //   .finally(() => setLoadingMore(false));
-    setTimeout(() => {
-      setPage((p) => p + 1);
-      setLoadingMore(false);
-    }, 300);
-  }, [hasMore]);
-
+  // unregister
   const handleUnregister = async (eventId) => {
-    const prev = myEvents;
-    setMyEvents((list) => list.filter((e) => e.id !== eventId)); // optimistic
-    setNotice("Unregistered from event"); // lightweight feedback
+    if (!userId || !eventId) return;
+    const prev = rawRows;
+    setRawRows((rows) => rows.filter((r) => String(fromMongoId(r?.event?._id || r?.event)) !== String(eventId)));
+    setNotice("Unregistered from event");
     setTimeout(() => setNotice(""), 2000);
 
     try {
-      // TODO: BACKEND — unregister endpoint
+      await api.post("/events/unregister", { userId, eventId });
     } catch (err) {
-      // revert on error
-      setMyEvents(prev);
-      setError(err?.message || "Failed to unregister");
+      setRawRows(prev);
+      setError(err?.response?.data?.message || "Failed to unregister");
     }
   };
 
@@ -208,7 +309,7 @@ export default function StudentDashboard() {
                 <h1 className="text-2xl font-black md:text-3xl">
                   Hey,{" "}
                   <span className="bg-gradient-to-r from-indigo-300 via-white to-violet-300 bg-clip-text text-transparent">
-                    {user.name}
+                    {userName}
                   </span>
                 </h1>
                 <p className="mt-1 text-sm text-slate-300">
@@ -217,7 +318,6 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* Quick Nav: Profile link as pill */}
             <Link
               to="/profile"
               className="inline-flex items-center gap-2 rounded-full border border-slate-700/60 bg-slate-900/60 px-3 py-1.5 text-xs font-semibold hover:bg-slate-800/70"
@@ -227,23 +327,11 @@ export default function StudentDashboard() {
             </Link>
           </div>
 
-          {/* Stats summary */}
+          {/* Stats */}
           <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard
-              icon={<Clock3 className="h-4 w-4 text-indigo-300" />}
-              label="Upcoming"
-              value={stats.upcoming}
-            />
-            <StatCard
-              icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />}
-              label="Registered"
-              value={stats.total}
-            />
-            <StatCard
-              icon={<Award className="h-4 w-4 text-violet-300" />}
-              label="Attended"
-              value={stats.attended}
-            />
+            <StatCard icon={<Clock3 className="h-4 w-4 text-indigo-300" />} label="Upcoming" value={stats.upcoming} />
+            <StatCard icon={<CheckCircle2 className="h-4 w-4 text-emerald-300" />} label="Registered" value={stats.total} />
+            <StatCard icon={<Award className="h-4 w-4 text-violet-300" />} label="Attended" value={stats.attended} />
           </div>
 
           {/* Controls */}
@@ -253,10 +341,7 @@ export default function StudentDashboard() {
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <input
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search your events…"
                 className="w-72 rounded-xl border border-slate-700/60 bg-slate-900/60 py-2 pl-9 pr-9 text-sm text-slate-200 placeholder:text-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
               />
@@ -271,16 +356,13 @@ export default function StudentDashboard() {
               )}
             </div>
 
-            {/* Filters */}
+            {/* Filters + Sort */}
             <div className="flex items-center gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 {["all", "registered", "waitlist", "attended"].map((k) => (
                   <button
                     key={k}
-                    onClick={() => {
-                      setStatusFilter(k);
-                      setPage(1);
-                    }}
+                    onClick={() => setStatusFilter(k)}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
                       statusFilter === k
                         ? "bg-indigo-600 text-white"
@@ -292,21 +374,15 @@ export default function StudentDashboard() {
                 ))}
               </div>
 
-              {/* Sort */}
               <div className="relative">
-                <label htmlFor="sortBy" className="sr-only">
-                  Sort by
-                </label>
+                <label htmlFor="sortBy" className="sr-only">Sort by</label>
                 <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">
                   <ArrowUpDown className="h-4 w-4 text-slate-500" />
                 </div>
                 <select
                   id="sortBy"
                   value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value);
-                    setPage(1);
-                  }}
+                  onChange={(e) => setSortBy(e.target.value)}
                   className="appearance-none rounded-xl border border-slate-700/60 bg-slate-900/60 pl-8 pr-8 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
                 >
                   <option value="upcoming">Upcoming first</option>
@@ -324,7 +400,6 @@ export default function StudentDashboard() {
 
       {/* CONTENT */}
       <div className="mx-auto max-w-7xl px-6 pb-14">
-        {/* Inline banners */}
         {notice && (
           <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-200">
             {notice}
@@ -338,13 +413,9 @@ export default function StudentDashboard() {
 
         {loading ? (
           <SkeletonGrid />
-        ) : visible.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState
-            title={
-              statusFilter === "all"
-                ? "No registered events yet."
-                : "No events match your filters."
-            }
+            title={statusFilter === "all" ? "No registered events yet." : "No events match your filters."}
             cta="Browse events"
             to="/events"
           />
@@ -362,7 +433,7 @@ export default function StudentDashboard() {
               }}
               className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3"
             >
-              {visible.map((e) => (
+              {filtered.map((e) => (
                 <EventCard key={e.id} e={e} onUnregister={handleUnregister} />
               ))}
             </motion.div>
@@ -456,10 +527,7 @@ function EventCard({ e, onUnregister }) {
     >
       <div className="relative h-36 w-full overflow-hidden">
         <motion.img
-          src={
-            e.cover ||
-            "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=1200&auto=format&fit=crop&q=60"
-          }
+          src={e.cover}
           alt=""
           className="h-full w-full object-cover"
           whileHover={{ scale: 1.06 }}
@@ -475,7 +543,7 @@ function EventCard({ e, onUnregister }) {
       <div className="p-4">
         <Link
           to={`/events/${e.id}`}
-          state={{ event: e }}
+          state={{ event: { ...e, _raw: { event_image: e.cover, title: e.title, event_date: e.date, location: e.location } } }}
           className="line-clamp-2 text-base font-bold text-slate-50 transition-colors hover:text-indigo-200"
         >
           {e.title}
@@ -495,7 +563,7 @@ function EventCard({ e, onUnregister }) {
         <div className="mt-4 flex items-center justify-between">
           <Link
             to={`/events/${e.id}`}
-            state={{ event: e }}
+            state={{ event: { ...e, _raw: { event_image: e.cover, title: e.title, event_date: e.date, location: e.location } } }}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800/60"
           >
             Details <ChevronRight className="h-4 w-4" />
@@ -558,6 +626,7 @@ function SkeletonGrid() {
 function formatDate(iso) {
   try {
     const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
     return d.toLocaleString(undefined, {
       year: "numeric",
       month: "short",

@@ -1,4 +1,4 @@
-// src/pages/EventDetails.jsx (clean)
+// src/pages/EventDetails.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -7,7 +7,7 @@ import api from "../utils/axiosInstance";
 /* tiny inline icon set */
 const CalendarIcon = (p) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...p}>
-    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
+    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c1.1 0 2 .9 2 2h14c1.1 0 2-.9 2-2V5c-1.1 0-2-.9-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
   </svg>
 );
 const LocationIcon = (p) => (
@@ -33,7 +33,10 @@ const fromMongoDate = (d) => {
 
 const adaptEvent = (doc) => {
   const id = fromMongoId(doc?._id) || doc?.id || doc?.event_id;
-  const startsAt = fromMongoDate(doc?.event_date) || fromMongoDate(doc?.startsAt) || fromMongoDate(doc?.start_time);
+  const startsAt =
+    fromMongoDate(doc?.event_date) ||
+    fromMongoDate(doc?.startsAt) ||
+    fromMongoDate(doc?.start_time);
   const regDeadline = fromMongoDate(doc?.registration_deadline);
 
   const dateStr = startsAt
@@ -66,43 +69,80 @@ export default function EventDetails() {
   const navigate = useNavigate();
   const { state } = useLocation();
 
-  // If navigated from list, we may have an event shape already
   const eventFromState = state?.event ? state.event : null;
 
   const [event, setEvent] = useState(eventFromState ? adaptEvent(eventFromState._raw || eventFromState) : null);
   const [loading, setLoading] = useState(!event);
   const [error, setError] = useState("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
-  // Fetch fresh from backend if needed
+  // skeleton cross-fade
+  const [showingSkeleton, setShowingSkeleton] = useState(true);
   useEffect(() => {
-    if (event) return; // already adapted from state
+    if (!loading) {
+      const t = setTimeout(() => setShowingSkeleton(false), 180);
+      return () => clearTimeout(t);
+    } else {
+      setShowingSkeleton(true);
+    }
+  }, [loading]);
 
+  // user id
+  const userId = (() => {
+    try {
+      const root = localStorage.getItem("persist:root");
+      if (!root) return null;
+      const parsed = JSON.parse(root);
+      const userSlice = JSON.parse(parsed.user || "{}");
+      return userSlice?.currentUser?._id || userSlice?.currentUser?.id || null;
+    } catch {
+      return null;
+    }
+  })();
+
+  // increment view (best-effort)
+  useEffect(() => {
+    if (!id) return;
+    (async () => { try { await api.patch(`/events/${id}/view`); } catch {} })();
+  }, [id]);
+
+  // fetch event if needed
+  useEffect(() => {
+    if (event) return;
     let ignore = false;
     const controller = new AbortController();
-
-    async function run() {
+    (async () => {
       try {
         setLoading(true);
         const res = await api.get(`/events/${id}`, { signal: controller.signal });
-        const data = res?.data;
-        if (ignore) return;
-        setEvent(adaptEvent(data));
+        if (!ignore) setEvent(adaptEvent(res?.data));
       } catch (e) {
-        if (e?.name === "CanceledError" || e?.name === "AbortError") return;
-        if (!ignore) setError("Event not found");
+        if (!ignore && e?.name !== "CanceledError" && e?.name !== "AbortError") setError("Event not found");
       } finally {
         if (!ignore) setLoading(false);
       }
-    }
-
-    run();
-    return () => {
-      ignore = true;
-      controller.abort();
-    };
+    })();
+    return () => { ignore = true; controller.abort(); };
   }, [id, event]);
 
-  // Parallax header
+  // mark registered if already
+  useEffect(() => {
+    if (!userId || !id) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const { data } = await api.get(`/events/user/${userId}/history`, { params: { status: "registered", limit: 200 } });
+        if (ignore || !data) return;
+        const arr = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+        const already = arr.some((h) => String(h?.event?._id || h?.event?.id || h?.event) === String(id));
+        if (already) setRegistered(true);
+      } catch {}
+    })();
+    return () => { ignore = true; };
+  }, [userId, id]);
+
+  // Parallax
   const { scrollY } = useScroll();
   const y = useTransform(scrollY, [0, 300], [0, 80]);
   const scale = useTransform(scrollY, [0, 300], [1, 1.08]);
@@ -118,14 +158,34 @@ export default function EventDetails() {
     return Math.min(100, Math.max(0, ((event.registeredCount || 0) / event.maxCapacity) * 100));
   }, [event]);
 
+  const isPast = useMemo(() => {
+    if (!event?.startsAt) return false;
+    return new Date(event.startsAt).getTime() < Date.now();
+  }, [event]);
+
   const brandGrad = "bg-gradient-to-r from-indigo-500 to-violet-500";
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     if (!event) return;
-    alert(`Pretend registered for: ${event.title}`);
+    if (!userId) { navigate("/login"); return; }
+    if (registered || spotsLeft === 0 || isPast) return;
+
+    try {
+      setIsRegistering(true);
+      setRegistered(true);
+      setEvent((prev) => prev ? { ...prev, registeredCount: (prev.registeredCount || 0) + 1 } : prev);
+      await api.post("/events/register", { userId, eventId: event.id });
+    } catch (err) {
+      setRegistered(false);
+      setEvent((prev) => prev ? { ...prev, registeredCount: Math.max(0, (prev.registeredCount || 1) - 1) } : prev);
+      alert(err?.response?.data?.message || "Registration failed.");
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
-  if (loading) {
+  // Loading skeleton (kept a bit longer to cross-fade)
+  if (showingSkeleton) {
     return (
       <section className="min-h-[60vh] bg-[#0b1220]">
         <div className="mx-auto max-w-5xl px-6 py-16">
@@ -153,11 +213,13 @@ export default function EventDetails() {
     );
   }
 
+  const buttonDisabled = registered || spotsLeft === 0 || isRegistering || isPast;
+
   return (
-    <section className="relative min-h-screen bg-[#0b1220] text-slate-100">
+    <section className={`relative min-h-screen bg-[#0b1220] text-slate-100 ${isPast ? "opacity-90" : ""}`}>
       {/* HERO */}
       <div className="relative">
-        <motion.div style={{ y, scale }} className="h-[40vh] w-full overflow-hidden">
+        <motion.div style={{ y, scale }} className={`h-[40vh] w-full overflow-hidden ${isPast ? "saturate-75" : ""}`}>
           {event.image ? (
             <img src={event.image} alt="" className="h-full w-full object-cover" loading="eager" />
           ) : (
@@ -176,7 +238,7 @@ export default function EventDetails() {
             >
               {event.title}
             </motion.h1>
-            <div className="mt-3 flex flex-wrap gap-2 text-sm text-slate-200">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-200">
               {(event.date || event.time) && (
                 <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 backdrop-blur">
                   <CalendarIcon className="h-4 w-4 text-indigo-300" />
@@ -199,6 +261,11 @@ export default function EventDetails() {
                   {event.category}
                 </span>
               )}
+              {isPast && (
+                <span className="inline-flex items-center gap-2 rounded-full bg-red-500/20 px-3 py-1 font-semibold text-red-200">
+                  Event Ended
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -219,7 +286,7 @@ export default function EventDetails() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="space-y-6"
+            className={`space-y-6 ${isPast ? "opacity-80" : ""}`}
           >
             <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6">
               <h2 className="mb-3 text-xl font-bold">About this event</h2>
@@ -235,13 +302,9 @@ export default function EventDetails() {
               <ul className="space-y-2 text-slate-300">
                 {event.duration && <li>• Duration: {event.duration}</li>}
                 {event.registrationDeadline && (
-                  <li>
-                    • Registration deadline: {new Date(event.registrationDeadline).toLocaleString()}
-                  </li>
+                  <li>• Registration deadline: {new Date(event.registrationDeadline).toLocaleString()}</li>
                 )}
-                {typeof event.maxCapacity === "number" && (
-                  <li>• Capacity: {event.maxCapacity}</li>
-                )}
+                {typeof event.maxCapacity === "number" && <li>• Capacity: {event.maxCapacity}</li>}
                 <li>• Type: {event.type || "—"}</li>
               </ul>
             </div>
@@ -254,21 +317,12 @@ export default function EventDetails() {
             transition={{ duration: 0.35, delay: 0.05 }}
             className="md:sticky md:top-20"
           >
-            <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6 shadow-lg backdrop-blur">
-              {/* capacity progress */}
+            <div className={`overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/60 p-6 shadow-lg backdrop-blur ${isPast ? "opacity-80" : ""}`}>
               {typeof event.maxCapacity === "number" && (
                 <>
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-sm text-slate-300">Spots</span>
-                    <span
-                      className={`text-sm font-semibold ${
-                        spotsLeft === 0
-                          ? "text-red-400"
-                          : spotsLeft <= 10
-                          ? "text-orange-300"
-                          : "text-emerald-400"
-                      }`}
-                    >
+                    <span className={`text-sm font-semibold ${spotsLeft === 0 ? "text-red-400" : spotsLeft <= 10 ? "text-orange-300" : "text-emerald-400"}`}>
                       {spotsLeft > 0 ? `${spotsLeft} left` : "Full"}
                     </span>
                   </div>
@@ -285,14 +339,19 @@ export default function EventDetails() {
 
               <button
                 onClick={handleRegister}
-                disabled={spotsLeft === 0}
+                disabled={buttonDisabled}
+                title={isPast ? "This event has ended" : undefined}
                 className={`mb-4 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${
-                  spotsLeft === 0
+                  buttonDisabled
                     ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
                     : "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-500"
                 }`}
               >
-                {spotsLeft === 0 ? "Event Full" : "Register Now"}
+                {isPast
+                  ? "Event Ended"
+                  : registered
+                    ? "Registered"
+                    : (spotsLeft === 0 ? "Event Full" : (isRegistering ? "Registering..." : "Register Now"))}
               </button>
 
               {/* meta */}
@@ -300,10 +359,7 @@ export default function EventDetails() {
                 {(event.date || event.time) && (
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4 text-indigo-300" />
-                    <span>
-                      {event.date}
-                      {event.time ? ` • ${event.time}` : ""}
-                    </span>
+                    <span>{event.date}{event.time ? ` • ${event.time}` : ""}</span>
                   </div>
                 )}
                 {event.location && (
@@ -318,7 +374,7 @@ export default function EventDetails() {
         </div>
       </div>
 
-      {/* background accents */}
+      {/* accents */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div
           className="absolute inset-0 opacity-25"
@@ -329,6 +385,17 @@ export default function EventDetails() {
           aria-hidden
         />
       </div>
+
+      {/* fade + shimmer styles (like Profile) */}
+      <style>{`
+        .fade-in { animation: fadeIn 300ms ease-out both; }
+        @media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .shimmer { position: relative; overflow: hidden; }
+        .shimmer::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent); animation: shimmer 1.4s infinite; }
+        @keyframes shimmer { 100% { transform: translateX(100%); } }
+        @media (prefers-reduced-motion: reduce) { .shimmer::after { animation: none; } }
+      `}</style>
     </section>
   );
 }
@@ -336,7 +403,7 @@ export default function EventDetails() {
 /* Skeleton for details */
 function Skeleton() {
   return (
-    <div className="animate-pulse">
+    <div className="animate-pulse shimmer">
       <div className="h-8 w-2/3 rounded bg-slate-800/60" />
       <div className="mt-4 h-5 w-1/3 rounded bg-slate-800/60" />
       <div className="mt-6 h-48 w-full rounded-xl bg-slate-800/60" />
