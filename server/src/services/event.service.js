@@ -147,6 +147,181 @@ const getPublishedEvents = async (filter = {}, options) => {
   return Event.paginate(publishedFilter, options);
 };
 
+// Event history operations
+const {StudentEventHistory} = require('../models/');
+/**
+ * Register a student for an event
+ * @param {ObjectId} userId
+ * @param {ObjectId} eventId
+ * @returns {Promise<StudentEventHistory>}
+ */ 
+const registerEvent = async (userId, eventId) => {
+  const event = await getEventById(eventId);
+  if (!event) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
+  }
+  
+  if (event.event_status !== 'published') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot register for an unpublished or cancelled event');
+  }
+  
+  if (event.registration_deadline < new Date()) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Registration deadline has passed');
+  }
+
+  if (event.total_registrations >= event.capacity) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Event has reached maximum capacity');
+  }
+
+  const exists = await StudentEventHistory.isHistoryExists(userId, eventId);
+  if (exists) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Already registered for this event');
+  }
+  
+  const registration = await StudentEventHistory.create({
+    user: userId,
+    event: eventId,
+    status: 'registered',
+    registered_at: new Date(),
+  });
+  
+  // Increment the event's registration count
+  await updateEventRegistrations(eventId, 1);
+  
+  return registration;
+};
+
+/**
+ * Unregister a student from an event
+ * @param {ObjectId} userId
+ * @param {ObjectId} eventId
+ * @returns {Promise<StudentEventHistory>}
+ */
+const unregisterEvent = async (userId, eventId) => {
+  const event = await getEventById(eventId);
+  if (!event) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
+  }
+  
+  const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
+  if (!history) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'No registration found for this event');
+  }
+  
+  if (history.status !== 'registered') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot unregister after attendance or feedback');
+  }
+  
+  if (event.event_date < new Date()) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot unregister after event date has passed');
+  }
+  
+  await history.deleteOne();
+  
+  // Decrement the event's registration count
+  await updateEventRegistrations(eventId, -1);
+  
+  return { message: 'Successfully unregistered from event' };
+};
+
+/**
+ * Mark a student's attendance for an event
+ * @param {ObjectId} userId
+ * @param {ObjectId} eventId
+ * @returns {Promise<StudentEventHistory>}
+ */
+const attendEvent = async (userId, eventId) => {
+  const event = await getEventById(eventId);
+  if (!event) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
+  }
+  
+  const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
+  if (!history) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'You are not registered for this event');
+  }
+  
+  if (history.status === 'attended' || history.status === 'feedback_given') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Attendance already marked for this event');
+  }
+  
+  history.status = 'attended';
+  await history.save();
+  
+  // Increment the event's unique attendee count
+  await Event.findByIdAndUpdate(
+    eventId,
+    { $inc: { unique_attendees: 1 } },
+    { new: true }
+  );
+  
+  return history;
+};
+
+/**
+ * Provide feedback for an event
+ * @param {ObjectId} userId
+ * @param {ObjectId} eventId
+ * @param {Number} feedback_score
+ * @returns {Promise<StudentEventHistory>}
+ */
+const provideFeedback = async (userId, eventId, feedback_score) => {
+  const event = await getEventById(eventId);
+  if (!event) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Event not found');
+  }
+  
+  const history = await StudentEventHistory.getHistoryByUserAndEvent(userId, eventId);
+  if (!history) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'You are not registered for this event');
+  }
+  
+  if (history.status !== 'attended') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 
+      history.status === 'registered' 
+        ? 'You must attend the event before providing feedback' 
+        : 'Feedback already provided for this event'
+    );
+  }
+  
+  history.status = 'feedback_given';
+  history.feedback_score = feedback_score;
+  history.feedback_at = new Date();
+  await history.save();
+  
+  // Update the event's average feedback score
+  const allFeedbacks = await StudentEventHistory.find({ 
+    event: eventId, 
+    status: 'feedback_given',
+    feedback_score: { $exists: true }
+  });
+  
+  if (allFeedbacks.length > 0) {
+    const totalScore = allFeedbacks.reduce((sum, item) => sum + item.feedback_score, 0);
+    const averageScore = totalScore / allFeedbacks.length;
+    
+    await Event.findByIdAndUpdate(
+      eventId,
+      { feedback_score: parseFloat(averageScore.toFixed(1)) },
+      { new: true }
+    );
+  }
+  
+  return history;
+};
+
+/**
+ * Get event history for a specific user
+ * @param {ObjectId} userId
+ * @param {Object} filter
+ * @param {Object} options
+ * @returns {Promise<QueryResult>}
+ */
+const getUserEventHistory = async (userId, filter = {}, options = {}) => {
+  const userFilter = { ...filter, user: userId };
+  return StudentEventHistory.paginate(userFilter, options);
+};
+
 module.exports = {
   createEvent,
   queryEvents,
@@ -158,4 +333,9 @@ module.exports = {
   getEventsByClub,
   getPublishedEvents,
   updateEventStatusById,
+  registerEvent,
+  unregisterEvent,
+  attendEvent,
+  provideFeedback,
+  getUserEventHistory,
 };

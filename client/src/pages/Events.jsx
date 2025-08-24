@@ -404,8 +404,11 @@ const Events = () => {
             <p className="mt-2 text-slate-400">Search, filter and discover everything happening.</p>
           </div>
 
-          {/* Desktop Create button (quick access) */}
+
           {role=="moderator"?(<Link
+
+          <Link
+
             to="/events/create"
             className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
           >
@@ -474,7 +477,7 @@ const Events = () => {
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
             <Link
-              to="/events/new"
+              to="/events/create"
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
             >
               <PlusIcon className="h-4 w-4" />

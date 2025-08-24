@@ -57,6 +57,39 @@ const updateEventStatus = catchAsync(async (req, res) => {
   res.send(event);
 });
 
+// Event registration operations
+const registerEvent = catchAsync(async (req, res) => {
+  const { userId, eventId } = req.body;
+  const history = await eventService.registerEvent(userId, eventId);
+  res.status(httpStatus.CREATED).send(history);
+});
+
+const unregisterEvent = catchAsync(async (req, res) => {
+  const { userId, eventId } = req.body;
+  const result = await eventService.unregisterEvent(userId, eventId);
+  res.send(result);
+});
+
+const attendEvent = catchAsync(async (req, res) => {
+  const { userId, eventId } = req.body;
+  const history = await eventService.attendEvent(userId, eventId);
+  res.send(history);
+});
+
+const provideFeedback = catchAsync(async (req, res) => {
+  const { userId, eventId, feedback_score } = req.body;
+  const history = await eventService.provideFeedback(userId, eventId, feedback_score);
+  res.send(history);
+});
+
+const getUserEventHistory = catchAsync(async (req, res) => {
+  const userId = req.params.userId;
+  const filter = pick(req.query, ['status']);
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const result = await eventService.getUserEventHistory(userId, filter, options);
+  res.send(result);
+});
+
 module.exports = {
   createEvent,
   getEvents,
@@ -67,4 +100,9 @@ module.exports = {
   getEventsByClub,
   getPublishedEvents,
   updateEventStatus,
+  registerEvent,
+  unregisterEvent,
+  attendEvent,
+  provideFeedback,
+  getUserEventHistory,
 };

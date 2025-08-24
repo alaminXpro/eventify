@@ -15,6 +15,78 @@ const swaggerDef = {
     },
   ],
   components: {
+    responses: {
+      BadRequest: {
+        description: 'Bad Request',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 400 },
+                message: { type: 'string', example: 'Bad Request' }
+              }
+            }
+          }
+        }
+      },
+      Unauthorized: {
+        description: 'Unauthorized',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 401 },
+                message: { type: 'string', example: 'Please authenticate' }
+              }
+            }
+          }
+        }
+      },
+      Forbidden: {
+        description: 'Forbidden',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 403 },
+                message: { type: 'string', example: 'Forbidden' }
+              }
+            }
+          }
+        }
+      },
+      NotFound: {
+        description: 'Not found',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 404 },
+                message: { type: 'string', example: 'Resource not found' }
+              }
+            }
+          }
+        }
+      },
+      DuplicateEmail: {
+        description: 'Duplicate email',
+        content: {
+          'application/json': {
+            schema: {
+              type: 'object',
+              properties: {
+                code: { type: 'integer', example: 400 },
+                message: { type: 'string', example: 'Email already taken' }
+              }
+            }
+          }
+        }
+      }
+    },
     schemas: {
       Event: {
         type: 'object',
@@ -41,6 +113,23 @@ const swaggerDef = {
           media_links: { type: 'array', items: { type: 'string' } },
           created_at: { type: 'string', format: 'date-time' },
           updated_at: { type: 'string', format: 'date-time' },
+        },
+      },
+      StudentEventHistory: {
+        type: 'object',
+        properties: {
+          _id: { type: 'string' },
+          user: { type: 'string' },
+          event: { type: 'string' },
+          status: { 
+            type: 'string',
+            enum: ['registered', 'attended', 'feedback_given']
+          },
+          registered_at: { type: 'string', format: 'date-time' },
+          feedback_score: { type: 'number' },
+          feedback_at: { type: 'string', format: 'date-time' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
         },
       },
       Club: {

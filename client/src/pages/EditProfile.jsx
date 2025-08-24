@@ -1,4 +1,4 @@
-// src/pages/EditProfile.jsx
+// src/pages/EditProfile.jsx (no preferences section)
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -14,11 +14,6 @@ const SKILLS_ENUM = [
   "Football","Cricket","Basketball","Fitness Training","Yoga","Meditation","Stress Management","Nutrition",
   "Volunteering","Fundraising","Social Impact","Environmental Awareness","Diversity & Inclusion","Community Building",
 ];
-
-const CATEGORY_ENUM   = ["Tech","Business","Design","Marketing","Finance","Law","Health","Education","Other"];
-const FORMAT_ENUM     = ["Online","Offline","Hybrid","Workshop","Seminar","Conference","Hackathon","Meetup","Other"];
-const GROUP_ENUM      = ["Small (1-10)","Medium (11-50)","Large (51-100)","Very Large (100+)"];
-const POPULARITY_ENUM = ["Low","Medium","High","Very High"];
 
 const DEPARTMENTS = ["", "CSE", "EEE", "CE", "ME", "BBA", "TE", "IPE"];
 const SEMESTERS   = ["", "1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2"];
@@ -104,12 +99,6 @@ export default function EditProfile() {
     twitter: "",
     facebook: "",
     github: "",
-    preferences: {
-      preferredEventCategory: [],
-      preferredEventFormat: [],
-      eventGroupSize: [],
-      eventPopularity: [],
-    },
   });
 
   useEffect(() => {
@@ -166,17 +155,10 @@ export default function EditProfile() {
       twitter: u?.twitter ?? "",
       facebook: u?.facebook ?? "",
       github: u?.github ?? "",
-      preferences: {
-        preferredEventCategory: Array.isArray(u?.preferences?.preferredEventCategory) ? u.preferences.preferredEventCategory : [],
-        preferredEventFormat:   Array.isArray(u?.preferences?.preferredEventFormat)   ? u.preferences.preferredEventFormat   : [],
-        eventGroupSize:         Array.isArray(u?.preferences?.eventGroupSize)         ? u.preferences.eventGroupSize         : [],
-        eventPopularity:        Array.isArray(u?.preferences?.eventPopularity)        ? u.preferences.eventPopularity        : [],
-      },
     });
   }
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const setPref  = (k, v) => setForm((f) => ({ ...f, preferences: { ...f.preferences, [k]: v }}));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -195,7 +177,6 @@ export default function EditProfile() {
         skills: Array.isArray(form.skills)
           ? form.skills
           : String(form.skills || "").split(",").map((s) => s.trim()).filter(Boolean),
-        preferences: { ...form.preferences },
       };
 
       const { data: updated } = await api.patch(`/users/${userId}`, payload);
@@ -294,34 +275,6 @@ export default function EditProfile() {
               <Field label="Twitter / X" value={form.twitter} onChange={(v) => setField("twitter", v)} placeholder="https://twitter.com/…" />
               <Field label="Facebook" value={form.facebook} onChange={(v) => setField("facebook", v)} placeholder="https://facebook.com/…" />
               <Field label="GitHub" value={form.github} onChange={(v) => setField("github", v)} placeholder="https://github.com/…" />
-            </div>
-
-            {/* Preferences (chips) */}
-            <div className="space-y-4">
-              <ChipMulti
-                label="Preferred Categories"
-                items={CATEGORY_ENUM}
-                value={form.preferences.preferredEventCategory}
-                onChange={(v) => setPref("preferredEventCategory", v)}
-              />
-              <ChipMulti
-                label="Preferred Formats"
-                items={FORMAT_ENUM}
-                value={form.preferences.preferredEventFormat}
-                onChange={(v) => setPref("preferredEventFormat", v)}
-              />
-              <ChipMulti
-                label="Group Size"
-                items={GROUP_ENUM}
-                value={form.preferences.eventGroupSize}
-                onChange={(v) => setPref("eventGroupSize", v)}
-              />
-              <ChipMulti
-                label="Popularity"
-                items={POPULARITY_ENUM}
-                value={form.preferences.eventPopularity}
-                onChange={(v) => setPref("eventPopularity", v)}
-              />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">
