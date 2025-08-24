@@ -242,7 +242,7 @@ const memberStatus = async (clubId, userId) => {
     return 'pending';
   }
 
-  throw new ApiError(httpStatus.NOT_FOUND);
+  return 'not-found';
 };
 
 /**
