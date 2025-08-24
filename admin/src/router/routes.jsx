@@ -22,6 +22,7 @@ const ChangePassword = lazy(() => import('../pages/changePassword'));
 const Profile = lazy(() => import('../pages/profile'));
 const Transactions = lazy(() => import('../pages/transactions'));
 const EventCreate = lazy(() => import('../pages/EventCreate'));
+const ManageEvents = lazy(() => import('../pages/manageEvents'));
 const routes = [
   // Public routes
   { path: '/login', element: <Login />, layout: 'blank' },
@@ -45,6 +46,7 @@ const routes = [
       { path: '/profile/:studentId', element: <Profile /> },
       { path: '/transactions/:clubId', element: <Transactions /> },
       { path: '/events/add', element: <EventCreate /> },
+      { path: '/manageEvents', element: <ManageEvents /> },
     ],
   },
 
