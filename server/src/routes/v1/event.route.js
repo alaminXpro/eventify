@@ -31,19 +31,52 @@ router
   .route('/:eventId/status')
   .patch(auth('manageEventStatus'), validate(eventValidation.updateEventStatus), eventController.updateEventStatus);
 
-router
-  .route('/:eventId/status')
-  .patch(auth('manageEventStatus'), validate(eventValidation.updateEventStatus), eventController.updateEventStatus);
-
+// Event view increment
 router
   .route('/:eventId/view')
   .patch(validate(eventValidation.incrementView), eventController.incrementEventView);
+
+// Event participation routes
+router.post(
+  '/register',
+  auth(),
+  validate(eventValidation.registerEvent),
+  eventController.registerEvent
+);
+
+router.post(
+  '/unregister',
+  auth(),
+  validate(eventValidation.unregisterEvent),
+  eventController.unregisterEvent
+);
+
+router.post(
+  '/attend',
+  auth(),
+  validate(eventValidation.attendEvent),
+  eventController.attendEvent
+);
+
+router.post(
+  '/feedback',
+  auth(),
+  validate(eventValidation.provideFeedback),
+  eventController.provideFeedback
+);
+
+router.get(
+  '/user/:userId/history',
+  auth(),
+  validate(eventValidation.getUserEventHistory),
+  eventController.getUserEventHistory
+);
 
 module.exports = router;
 
 /**
  * @swagger
- * /events/{id}/status:
+ * /events/{eventId}/status:
  *   patch:
  *     summary: Update event status
  *     description: Only admin can update event status (publish/unpublish/cancel events).
@@ -52,7 +85,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: eventId
  *         required: true
  *         schema:
  *           type: string
@@ -79,6 +112,236 @@ module.exports = router;
  *           application/json:
  *             schema:
  *                $ref: '#/components/schemas/Event'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ */
+
+/**
+ * @swagger
+ * /events/register:
+ *   post:
+ *     summary: Register for an event
+ *     description: Register a user for an event.
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - eventId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               eventId:
+ *                 type: string
+ *             example:
+ *               userId: "64a7b8f123456789abcdef02"
+ *               eventId: "64a7b8f123456789abcdef03"
+ *     responses:
+ *       "201":
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StudentEventHistory'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ * /events/unregister:
+ *   post:
+ *     summary: Unregister from an event
+ *     description: Unregister a user from an event they previously registered for.
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - eventId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               eventId:
+ *                 type: string
+ *             example:
+ *               userId: "64a7b8f123456789abcdef02"
+ *               eventId: "64a7b8f123456789abcdef03"
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ * /events/attend:
+ *   post:
+ *     summary: Mark attendance for an event
+ *     description: Mark a user as having attended an event.
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - eventId
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               eventId:
+ *                 type: string
+ *             example:
+ *               userId: "64a7b8f123456789abcdef02"
+ *               eventId: "64a7b8f123456789abcdef03"
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StudentEventHistory'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ * /events/feedback:
+ *   post:
+ *     summary: Provide feedback for an event
+ *     description: Provide a feedback score for an event the user attended.
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - eventId
+ *               - feedback_score
+ *             properties:
+ *               userId:
+ *                 type: string
+ *               eventId:
+ *                 type: string
+ *               feedback_score:
+ *                 type: number
+ *                 minimum: 1
+ *                 maximum: 5
+ *             example:
+ *               userId: "64a7b8f123456789abcdef02"
+ *               eventId: "64a7b8f123456789abcdef03"
+ *               feedback_score: 5
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/StudentEventHistory'
+ *       "400":
+ *         $ref: '#/components/responses/BadRequest'
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "404":
+ *         $ref: '#/components/responses/NotFound'
+ *
+ * /events/user/{userId}/history:
+ *   get:
+ *     summary: Get user's event history
+ *     description: Get event participation history for a specific user.
+ *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [registered, attended, feedback_given]
+ *         description: Filter by participation status
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *         description: Sort by query in the format field:desc/asc
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         default: 10
+ *         description: Maximum number of results per page
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         default: 1
+ *         description: Page number
+ *     responses:
+ *       "200":
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 results:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/StudentEventHistory'
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ *                 totalPages:
+ *                   type: integer
+ *                 totalResults:
+ *                   type: integer
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
@@ -337,14 +600,14 @@ module.exports = router;
 
 /**
  * @swagger
- * /events/{id}:
+ * /events/{eventId}:
  *   get:
  *     summary: Get an event
  *     description: Retrieve an event by id.
  *     tags: [Events]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: eventId
  *         required: true
  *         schema:
  *           type: string
@@ -367,7 +630,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: eventId
  *         required: true
  *         schema:
  *           type: string
@@ -393,7 +656,7 @@ module.exports = router;
  *               event_status:
  *                 type: string
  *                 enum: [unpublished, published, cancelled]
- *                 description: Cannot be updated through this endpoint - use /events/{id}/status instead
+ *                 description: Cannot be updated through this endpoint - use /events/{eventId}/status instead
  *               event_date:
  *                 type: string
  *                 format: date-time
@@ -453,7 +716,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: eventId
  *         required: true
  *         schema:
  *           type: string
@@ -471,14 +734,14 @@ module.exports = router;
 
 /**
  * @swagger
- * /events/{id}/view:
+ * /events/{eventId}/view:
  *   patch:
  *     summary: Increment event view count
  *     description: Increment the view count of an event.
  *     tags: [Events]
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: eventId
  *         required: true
  *         schema:
  *           type: string

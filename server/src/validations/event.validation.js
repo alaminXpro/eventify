@@ -100,6 +100,46 @@ const updateEventStatus = {
     event_status: Joi.string().valid('unpublished', 'published', 'cancelled').required(),
   }),
 };
+const registerEvent = {
+  body: Joi.object().keys({
+    userId: Joi.string().custom(objectId).required(),
+    eventId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const unregisterEvent = {
+  body: Joi.object().keys({
+    userId: Joi.string().custom(objectId).required(),
+    eventId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const attendEvent = {
+  body: Joi.object().keys({
+    userId: Joi.string().custom(objectId).required(),
+    eventId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const provideFeedback = {
+  body: Joi.object().keys({
+    userId: Joi.string().custom(objectId).required(),
+    eventId: Joi.string().custom(objectId).required(),
+    feedback_score: Joi.number().min(1).max(5).required(),
+  }),
+};
+
+const getUserEventHistory = {
+  params: Joi.object().keys({
+    userId: Joi.string().custom(objectId),
+  }),
+  query: Joi.object().keys({
+    status: Joi.string().valid('registered', 'attended', 'feedback_given'),
+    sortBy: Joi.string(),
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
+  }),
+};
 
 module.exports = {
   createEvent,
@@ -110,4 +150,9 @@ module.exports = {
   incrementView,
   getEventsByClub,
   updateEventStatus,
+  registerEvent,
+  unregisterEvent,
+  attendEvent,
+  provideFeedback,
+  getUserEventHistory,
 };
