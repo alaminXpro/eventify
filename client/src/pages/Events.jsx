@@ -1,4 +1,4 @@
-// src/pages/Events.jsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
@@ -37,6 +37,7 @@ const toMonthDay = (isoOrDate) => {
   };
 };
 
+// include backend field event_date first
 const getStartDate = (e) =>
   e?.event_date ||
   e?.startsAt ||
@@ -75,8 +76,8 @@ const adaptEvent = (e) => {
     maxCapacity: e.capacity ?? e.maxCapacity ?? e.max_capacity ?? 0,
     registeredCount: e.registered ?? e.registeredCount ?? e.total_registrations ?? e.attendees_count ?? 0,
     createdAt: e.createdAt || e.created_at || e.publishedAt || startsAt,
-    startsAtMs,
-    isPast,
+    startsAtMs,                 // ← keep raw start for logic
+    isPast,                     
     _raw: e,
   };
 };
@@ -93,6 +94,8 @@ const EventCard = ({ event, onRegister, disabled }) => {
   const brandGradSoft = "bg-gradient-to-r from-indigo-400 to-violet-400";
 
   const btnDisabled = disabled || spotsLeft === 0 || event.isPast;
+
+  // subtle visual for past events
   const pastClasses = event.isPast ? "opacity-60 saturate-50" : "";
 
   return (
@@ -174,6 +177,7 @@ const EventCard = ({ event, onRegister, disabled }) => {
           </div>
         </div>
 
+        {/* Important: prevent card Link navigation */}
         <motion.button
           onClick={(ev) => {
             ev.preventDefault(); ev.stopPropagation();
@@ -207,8 +211,7 @@ const Events = () => {
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  // REMOVE "upcoming": default to "newest"
-  const [sortBy, setSortBy] = useState("newest");
+  const [sortBy, setSortBy] = useState("upcoming");
   const [page, setPage] = useState(1);
 
   const [events, setEvents] = useState([]);
@@ -218,9 +221,12 @@ const Events = () => {
   const [error, setError] = useState("");
   const [hasMore, setHasMore] = useState(true);
 
+  // Track registered events to disable button
   const [registeredIds, setRegisteredIds] = useState(new Set());
+
   const loadMoreRef = useRef(null);
 
+  // role for create button (keep your logic)
   const [role] = useState(() => {
     try {
       const persisted = localStorage.getItem("persist:root");
@@ -233,6 +239,7 @@ const Events = () => {
     }
   });
 
+  // current user id for registration API
   const userId = useMemo(() => {
     try {
       const persisted = localStorage.getItem("persist:root");
@@ -245,21 +252,24 @@ const Events = () => {
     }
   }, []);
 
+  // Debounce search input (300ms)
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  // UPDATED sort mapping (no "upcoming")
+  // Sort mapping compatible with backend
   const sortParam = useMemo(() => {
     switch (sortBy) {
       case "popular":  return "total_registrations:desc";
+      case "newest":   return "created_at:desc";
       case "capacity": return "capacity:desc";
-      case "newest":
-      default:         return "created_at:desc";
+      case "upcoming":
+      default:         return "event_date:asc";
     }
   }, [sortBy]);
 
+  // Fetch events
   useEffect(() => {
     const controller = new AbortController();
     const isFirstPage = page === 1;
@@ -301,12 +311,14 @@ const Events = () => {
         const adapted = items.map(adaptEvent).filter((e) => e.id);
         setEvents((prev) => (isFirstPage ? adapted : [...prev, ...adapted]));
 
+        // Derive categories from loaded data
         setCategories((prev) => {
           const set = new Set(prev.includes("All") ? prev : ["All", ...prev]);
           adapted.forEach((e) => e.category && set.add(e.category));
           return Array.from(set);
         });
 
+        // hasMore
         if (typeof hasMoreFromApi === "boolean") {
           setHasMore(hasMoreFromApi);
         } else if (typeof total === "number") {
@@ -330,6 +342,7 @@ const Events = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ, activeCategory, sortBy, page]);
 
+  // Fetch registered history (to disable buttons)
   useEffect(() => {
     if (!userId) return;
     let ignore = false;
@@ -340,15 +353,19 @@ const Events = () => {
         const list = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
         const idSet = new Set(list.map((h) => h?.event?._id || h?.event?.id || h?.event));
         setRegisteredIds(idSet);
-      } catch {}
+      } catch {
+        // non-blocking
+      }
     })();
     return () => { ignore = true; };
   }, [userId]);
 
+  // Reset to page 1 whenever filters change (except page itself)
   useEffect(() => {
     setPage(1);
   }, [debouncedQ, activeCategory, sortBy]);
 
+  // Quick Register handler
   const onRegister = async (event) => {
     if (!userId) {
       navigate("/login");
@@ -356,6 +373,7 @@ const Events = () => {
     }
     if (event.isPast || registeredIds.has(event.id)) return;
 
+    // optimistic: disable and bump count locally
     setRegisteredIds((s) => new Set(s).add(event.id));
     setEvents((prev) =>
       prev.map((e) => (e.id === event.id ? { ...e, registeredCount: (e.registeredCount || 0) + 1 } : e))
@@ -363,7 +381,9 @@ const Events = () => {
 
     try {
       await api.post("/events/register", { userId, eventId: event.id });
+      // success: nothing else to do
     } catch (err) {
+      // rollback on failure
       setRegisteredIds((s) => {
         const n = new Set(s);
         n.delete(event.id);
@@ -381,6 +401,7 @@ const Events = () => {
     setPage((p) => p + 1);
   };
 
+  // Infinite scroll
   useEffect(() => {
     if (prefersReducedMotion) return;
     const node = loadMoreRef.current;
@@ -407,7 +428,7 @@ const Events = () => {
             <p className="mt-2 text-slate-400">Search, filter and discover everything happening.</p>
           </div>
 
-          {role === "moderator" ? (
+          {role == "moderator" ? (
             <Link
               to="/events/create"
               className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
@@ -450,7 +471,7 @@ const Events = () => {
               ))}
             </div>
 
-            {/* Sort (REMOVED 'Upcoming') */}
+            {/* Sort */}
             <div className="flex items-center gap-2">
               <label className="sr-only" htmlFor="sortBy">Sort events</label>
               <select
@@ -459,6 +480,7 @@ const Events = () => {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
               >
+                <option value="upcoming">Upcoming</option>
                 <option value="popular">Most popular</option>
                 <option value="newest">Newest</option>
                 <option value="capacity">Largest capacity</option>
@@ -477,15 +499,13 @@ const Events = () => {
         ) : events.length === 0 ? (
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
-            {role === "moderator" && (
-              <Link
-                to="/events/create"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                <PlusIcon className="h-4 w-4" />
-                Create the first event
-              </Link>
-            )}
+            <Link
+              to="/events/create"
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Create the first event
+            </Link>
           </div>
         ) : (
           <>
@@ -527,16 +547,14 @@ const Events = () => {
         )}
       </div>
 
-      {/* Floating Create FAB for mobile — only moderators */}
-      {role === "moderator" && (
-        <Link
-          to="/events/create"
-          className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
-          aria-label="Create Event"
-        >
-          <PlusIcon className="h-6 w-6" />
-        </Link>
-      )}
+      {/* Floating Create FAB for mobile */}
+      <Link
+        to="/events/create"
+        className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
+        aria-label="Create Event"
+      >
+        <PlusIcon className="h-6 w-6" />
+      </Link>
 
       {/* page bg accents */}
       <div className="pointer-events-none absolute inset-0 -z-10">

@@ -1,8 +1,17 @@
+// event.model.js
 const mongoose = require('mongoose');
 const { SKILLS_ENUM } = require('../config/constant')
 const { toJSON, paginate } = require('./plugins');
-const EventSchema = new mongoose.Schema({
 
+/* ADD: registration question sub-schema */
+const RegistrationQuestionSchema = new mongoose.Schema({
+  label:    { type: String, required: true }, // e.g. "T-shirt size?"
+  type:     { type: String, enum: ["short_text","long_text","single_select","multi_select"], default: "short_text" },
+  required: { type: Boolean, default: false },
+  options:  [{ type: String }],               // for select types
+}, { _id: true });
+
+const EventSchema = new mongoose.Schema({
   title: { type: String, required: true },
   event_description: { type: String, required: true },
   category: {
@@ -22,14 +31,17 @@ const EventSchema = new mongoose.Schema({
   event_type: { type: String, enum: ["online", "offline", "hybrid"], required: true },
   total_registrations: { type: Number, default: 0 },
   unique_attendees: { type: Number, default: 0 },
-  feedback_score: { type: Number, default: 0 },// avg rating
+  feedback_score: { type: Number, default: 0 },
   view: { type: Number, default: 0 },
 
-  skills_offered: {type:[String],enum:SKILLS_ENUM,default:[]},
+  skills_offered: { type:[String], enum: SKILLS_ENUM, default: [] },
   topics: [String],
 
   // Social proof
   media_links: [String],
+
+  /* ADD: registration questions on the event */
+  registration_questions: { type: [RegistrationQuestionSchema], default: [] },
 
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
@@ -38,14 +50,17 @@ const EventSchema = new mongoose.Schema({
 EventSchema.plugin(toJSON);
 EventSchema.plugin(paginate);
 
-/**
- * @typedef Event
- */
+/* (optional) keep updated_at fresh */
+EventSchema.pre('save', function(next) {
+  this.updated_at = new Date();
+  next();
+});
+
 EventSchema.statics.isEventExists = async function (title, excludeEventId) {
   const event = await this.findOne({ title, _id: { $ne: excludeEventId } });
   return !!event;
 };
 
 const Event = mongoose.model('Event', EventSchema);
-
 module.exports = Event;
+
