@@ -28,6 +28,7 @@
     "@x1mrdonut1x/nouislider-react": "^3.4.3",
     "apexcharts": "^3.53.0",
     "axios": "^1.7.7",
+    "date-fns": "^4.1.0",
     "easymde": "^2.18.0",
     "firebase": "^10.13.2",
     "formik": "^2.4.6",
