@@ -70,6 +70,17 @@ const userSchema = mongoose.Schema(
         default: [],
       },
     },
+    clubs: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Club'
+    }],
+    // previous event participation
+    attendedEvents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event'
+      }
+    ],
     // New fields
     department: {
       type: String,

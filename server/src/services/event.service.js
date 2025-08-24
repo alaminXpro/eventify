@@ -16,7 +16,7 @@ const updateEventStatusById = async (eventId, status) => {
   return event;
 };
 const httpStatus = require('http-status').default;
-const { Event } = require('../models');
+const { Event, User, Club, EventRecommendation } = require('../models');
 const ApiError = require('../utils/ApiError');
 
 /**
@@ -177,18 +177,82 @@ const registerEvent = async (userId, eventId) => {
   if (exists) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Already registered for this event');
   }
+
+  // Check if EventRecommendation already exists
+  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
+  if (recommendationExists) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Recommendation data already exists for this event');
+  }
   
-  const registration = await StudentEventHistory.create({
+  // Get user data with populated clubs and attended events
+  const user = await User.findById(userId)
+    .populate('clubs', 'name')
+    .populate('attendedEvents', 'title');
+    
+  if (!user) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'User not found');
+  }
+
+  // Get event with populated club hosting data
+  const eventWithClub = await Event.findById(eventId).populate('club_hosting', 'name');
+  
+  if (!eventWithClub.club_hosting) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Event must have a hosting club');
+  }
+  
+  // Prepare data for EventRecommendation
+  const recommendationData = {
     user: userId,
     event: eventId,
-    status: 'registered',
+    semester: user.semester || '',
+    department: user.department || '',
+    club_hosting: eventWithClub.club_hosting._id,
+    event_topics: eventWithClub.topics || [],
+    event_description: eventWithClub.event_description,
+    category: eventWithClub.category,
+    skills_offered: eventWithClub.skills_offered || [],
+    registration_deadline: eventWithClub.registration_deadline,
+    joined_clubs: user.clubs ? user.clubs.map(club => club.name) : [],
+    previous_participation: user.attendedEvents ? user.attendedEvents.map(event => event.title) : [],
+    user_skills: user.skills || [],
+    preferred_event_category: user.preferences?.preferredEventCategory || [],
     registered_at: new Date(),
-  });
-  
-  // Increment the event's registration count
-  await updateEventRegistrations(eventId, 1);
-  
-  return registration;
+  };
+
+  try {
+    // Create the registration record
+    const registration = await StudentEventHistory.create({
+      user: userId,
+      event: eventId,
+      status: 'registered',
+      registered_at: new Date(),
+    });
+
+    // Create the recommendation record
+    await EventRecommendation.create(recommendationData);
+    
+    // Increment the event's registration count
+    await updateEventRegistrations(eventId, 1);
+    
+    return registration;
+  } catch (error) {
+    // If EventRecommendation creation fails, we should still allow registration
+    // but log the error for debugging
+    console.error('Failed to create EventRecommendation:', error);
+    
+    // Create the registration record anyway
+    const registration = await StudentEventHistory.create({
+      user: userId,
+      event: eventId,
+      status: 'registered',
+      registered_at: new Date(),
+    });
+    
+    // Increment the event's registration count
+    await updateEventRegistrations(eventId, 1);
+    
+    return registration;
+  }
 };
 
 /**
