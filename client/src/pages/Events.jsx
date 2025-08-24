@@ -1,6 +1,6 @@
 // src/pages/Events.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import api from "../utils/axiosInstance";
 
@@ -9,7 +9,7 @@ import api from "../utils/axiosInstance";
 ========================================= */
 const CalendarIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
+    <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c1.1 0 2 .9 2 2h14c1.1 0 2-.9 2-2V5c-1.1 0-2-.9-2-2zm0 16H5V8h14v11zM7 10h5v5H7z" />
   </svg>
 );
 const LocationIcon = (props) => (
@@ -26,6 +26,8 @@ const PlusIcon = (props) => (
 /* =========================================
    Helpers
 ========================================= */
+const now = () => Date.now();
+
 const toMonthDay = (isoOrDate) => {
   const d = isoOrDate ? new Date(isoOrDate) : null;
   if (!d || isNaN(d)) return { month: "", day: "" };
@@ -35,34 +37,35 @@ const toMonthDay = (isoOrDate) => {
   };
 };
 
-// Extract a start datetime from various backend field names
 const getStartDate = (e) =>
-  e?.startsAt || e?.startAt || e?.start_time || e?.startTime || e?.start_date || e?.startDate || e?.date;
+  e?.event_date ||
+  e?.startsAt ||
+  e?.startAt ||
+  e?.start_time ||
+  e?.startTime ||
+  e?.start_date ||
+  e?.startDate ||
+  e?.date;
 
-// Map your API event -> UI event shape the card expects
 const adaptEvent = (e) => {
   const startsAt = getStartDate(e);
   const { month, day } = toMonthDay(startsAt);
 
   const dateStr = startsAt
-    ? new Date(startsAt).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
+    ? new Date(startsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : "";
 
   const timeStr = startsAt
-    ? new Date(startsAt).toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    })
+    ? new Date(startsAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
     : "";
+
+  const startsAtMs = startsAt ? new Date(startsAt).getTime() : null;
+  const isPast = startsAtMs ? startsAtMs < now() : false;
 
   return {
     id: e.id || e._id || e.event_id,
     title: e.title || e.name || "Untitled Event",
-    image: e.bannerUrl || e.banner_url || e.image || e.cover || "",
+    image: e.event_image || e.bannerUrl || e.banner_url || e.image || e.cover || "",
     category: e.category || e.event_type || "General",
     date: dateStr,
     time: timeStr,
@@ -70,9 +73,10 @@ const adaptEvent = (e) => {
     day,
     location: e.location || e.venue || "TBA",
     maxCapacity: e.capacity ?? e.maxCapacity ?? e.max_capacity ?? 0,
-    registeredCount:
-      e.registered ?? e.registeredCount ?? e.total_registrations ?? e.attendees_count ?? 0,
+    registeredCount: e.registered ?? e.registeredCount ?? e.total_registrations ?? e.attendees_count ?? 0,
     createdAt: e.createdAt || e.created_at || e.publishedAt || startsAt,
+    startsAtMs,
+    isPast,
     _raw: e,
   };
 };
@@ -80,7 +84,7 @@ const adaptEvent = (e) => {
 /* =========================================
    Card
 ========================================= */
-const EventCard = ({ event, onRegister }) => {
+const EventCard = ({ event, onRegister, disabled }) => {
   const spotsLeft = Math.max(0, (event.maxCapacity ?? 0) - (event.registeredCount ?? 0));
   const denom = Math.max(1, event.maxCapacity ?? 1);
   const fillPercentage = Math.min(100, Math.max(0, ((event.registeredCount ?? 0) / denom) * 100));
@@ -88,21 +92,22 @@ const EventCard = ({ event, onRegister }) => {
   const brandGrad = "bg-gradient-to-r from-indigo-500 to-violet-500";
   const brandGradSoft = "bg-gradient-to-r from-indigo-400 to-violet-400";
 
+  const btnDisabled = disabled || spotsLeft === 0 || event.isPast;
+  const pastClasses = event.isPast ? "opacity-60 saturate-50" : "";
+
   return (
     <motion.article
       layout
       role="article"
-      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-800/50 bg-gradient-to-br from-slate-950 to-slate-900 shadow-md"
-      whileHover={{ y: -4 }}
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border border-slate-800/50 bg-gradient-to-br from-slate-950 to-slate-900 shadow-md ${pastClasses}`}
+      whileHover={{ y: event.isPast ? 0 : -4 }}
       transition={{ type: "spring", stiffness: 300, damping: 24, mass: 0.6 }}
+      aria-disabled={event.isPast ? "true" : "false"}
     >
       <span
         aria-hidden
         className="pointer-events-none absolute -inset-[1px] rounded-2xl opacity-0 blur-[2px] transition-opacity duration-300 group-hover:opacity-100"
-        style={{
-          background:
-            "linear-gradient(120deg,transparent,rgba(99,102,241,0.25),rgba(139,92,246,0.25),transparent)",
-        }}
+        style={{ background: "linear-gradient(120deg,transparent,rgba(99,102,241,0.25),rgba(139,92,246,0.25),transparent)" }}
       />
 
       <div className="relative h-44 overflow-hidden">
@@ -110,7 +115,7 @@ const EventCard = ({ event, onRegister }) => {
           src={event.image}
           alt=""
           className="h-full w-full object-cover"
-          whileHover={{ scale: 1.06 }}
+          whileHover={{ scale: event.isPast ? 1 : 1.06 }}
           transition={{ duration: 0.45 }}
           loading="lazy"
         />
@@ -119,7 +124,7 @@ const EventCard = ({ event, onRegister }) => {
         <div className="absolute left-3 top-3">
           <motion.span
             className={`rounded-md ${brandGrad} px-2 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur`}
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: event.isPast ? 1 : 1.05 }}
             transition={{ duration: 0.15 }}
           >
             {event.category}
@@ -128,7 +133,7 @@ const EventCard = ({ event, onRegister }) => {
 
         <motion.div
           className="absolute right-3 top-3 rounded-lg bg-white/90 p-2 text-center shadow-sm backdrop-blur"
-          whileHover={{ scale: 1.05 }}
+          whileHover={{ scale: event.isPast ? 1 : 1.05 }}
           transition={{ duration: 0.15 }}
         >
           <div className="text-[10px] font-semibold leading-3 text-slate-600">{event.month}</div>
@@ -144,9 +149,7 @@ const EventCard = ({ event, onRegister }) => {
         <div className="mb-3 flex-1 space-y-1">
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <CalendarIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
-            <span className="truncate">
-              {event.date} • {event.time}
-            </span>
+            <span className="truncate">{event.date} • {event.time}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <LocationIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
@@ -165,23 +168,28 @@ const EventCard = ({ event, onRegister }) => {
             <motion.div
               className={`h-1.5 rounded-full ${spotsLeft === 0 ? "bg-slate-600" : brandGradSoft}`}
               initial={{ width: 0 }}
-              animate={{ width: `${fillPercentage}%` }}
+              animate={{ width: `${Math.max(0, Math.min(100, fillPercentage))}%` }}
               transition={{ duration: 0.9, delay: 0.1, ease: "easeOut" }}
             />
           </div>
         </div>
 
         <motion.button
-          onClick={() => onRegister?.(event)}
-          className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${spotsLeft === 0
+          onClick={(ev) => {
+            ev.preventDefault(); ev.stopPropagation();
+            if (!event.isPast) onRegister?.(event);
+          }}
+          className={`relative mt-auto w-full overflow-hidden rounded-xl py-2 px-3 text-sm font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+            btnDisabled
               ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
               : "bg-gradient-to-r from-indigo-500 to-violet-500 text-white hover:from-indigo-400 hover:to-violet-500"
-            }`}
-          disabled={spotsLeft === 0}
-          whileHover={spotsLeft > 0 ? { scale: 1.02 } : {}}
-          whileTap={spotsLeft > 0 ? { scale: 0.98 } : {}}
+          }`}
+          disabled={btnDisabled}
+          whileHover={!btnDisabled ? { scale: 1.02 } : {}}
+          whileTap={!btnDisabled ? { scale: 0.98 } : {}}
+          title={event.isPast ? "This event has ended" : undefined}
         >
-          {spotsLeft === 0 ? "Event Full" : "Quick Register"}
+          {event.isPast ? "Event Ended" : (btnDisabled ? "Registered" : "Quick Register")}
         </motion.button>
       </div>
     </motion.article>
@@ -192,13 +200,15 @@ const EventCard = ({ event, onRegister }) => {
    Page: All Events
 ========================================= */
 const Events = () => {
+  const navigate = useNavigate();
   const PAGE_SIZE = 12;
   const prefersReducedMotion = useReducedMotion();
 
   const [query, setQuery] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [sortBy, setSortBy] = useState("upcoming");
+  // REMOVE "upcoming": default to "newest"
+  const [sortBy, setSortBy] = useState("newest");
   const [page, setPage] = useState(1);
 
   const [events, setEvents] = useState([]);
@@ -206,74 +216,59 @@ const Events = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
-
   const [hasMore, setHasMore] = useState(true);
+
+  const [registeredIds, setRegisteredIds] = useState(new Set());
   const loadMoreRef = useRef(null);
 
-  // Debounce search input (300ms)
+  const [role] = useState(() => {
+    try {
+      const persisted = localStorage.getItem("persist:root");
+      if (!persisted) return null;
+      const parsed = JSON.parse(persisted);
+      const userState = JSON.parse(parsed.user || "{}");
+      return userState?.currentUser?.role || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const userId = useMemo(() => {
+    try {
+      const persisted = localStorage.getItem("persist:root");
+      if (!persisted) return null;
+      const parsed = JSON.parse(persisted);
+      const userState = JSON.parse(parsed.user || "{}");
+      return userState?.currentUser?._id || userState?.currentUser?.id || null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  // Fetch categories once (or derive from first page)
-  useEffect(() => {
-    let ignore = false;
-    const controller = new AbortController();
-    async function fetchCategories() {
-      try {
-        // Optional endpoint; if your API doesn't have this, we will gracefully fall back
-        const { data } = await api.get("/events/published/categories", {
-          signal: controller.signal,
-        });
-        if (ignore) return;
-        if (Array.isArray(data) && data.length) {
-          setCategories(["All", ...data]);
-        }
-      } catch {
-        // silently keep default and derive later from events
-      }
-    }
-    fetchCategories();
-    return () => {
-      ignore = true;
-      controller.abort();
-    };
-  }, []);
-
-  // Build backend sortBy string "field:(desc|asc)"
+  // UPDATED sort mapping (no "upcoming")
   const sortParam = useMemo(() => {
     switch (sortBy) {
-      case "popular":
-        return "total_registrations:desc";
+      case "popular":  return "total_registrations:desc";
+      case "capacity": return "capacity:desc";
       case "newest":
-        return "created_at:desc";
-      case "capacity":
-        return "capacity:desc";
-      case "upcoming":
-      default:
-        // Try multiple common field names on backend; whichever exists will be used server-side
-        // If your API only recognizes one, update this to that field.
-        return "startsAt:asc"; // e.g. startsAt/start_time/start_date on server
+      default:         return "created_at:desc";
     }
   }, [sortBy]);
 
-  // Fetch events whenever filters/sort/page change
   useEffect(() => {
     const controller = new AbortController();
     const isFirstPage = page === 1;
 
     async function fetchEvents() {
-      if (isFirstPage) {
-        setLoading(true);
-        setError("");
-      } else {
-        setLoadingMore(true);
-      }
+      if (isFirstPage) { setLoading(true); setError(""); } else { setLoadingMore(true); }
 
       try {
         const params = {
-          // Controller's getPublishedEvents filters recognize: title, category, event_type, skills_offered
           title: debouncedQ || undefined,
           category: activeCategory !== "All" ? activeCategory : undefined,
           sortBy: sortParam,
@@ -284,19 +279,18 @@ const Events = () => {
         const res = await api.get("/events/published", { params, signal: controller.signal });
         const payload = res?.data;
 
-        // Support multiple possible shapes from backend
         let items = [];
-        let total = undefined;
-        let hasMoreFromApi = undefined;
+        let total;
+        let hasMoreFromApi;
 
         if (payload && typeof payload === "object") {
           if (Array.isArray(payload.results)) {
             items = payload.results;
-            total = payload.totalResults ?? payload.total ?? undefined;
+            total = payload.totalResults ?? payload.total;
           } else if (Array.isArray(payload.items)) {
             items = payload.items;
             hasMoreFromApi = payload?.pagination?.hasMore;
-            total = payload?.pagination?.total ?? undefined;
+            total = payload?.pagination?.total;
           } else if (Array.isArray(payload.data)) {
             items = payload.data;
           }
@@ -305,70 +299,88 @@ const Events = () => {
         }
 
         const adapted = items.map(adaptEvent).filter((e) => e.id);
-
         setEvents((prev) => (isFirstPage ? adapted : [...prev, ...adapted]));
 
-        // Derive/compute hasMore
+        setCategories((prev) => {
+          const set = new Set(prev.includes("All") ? prev : ["All", ...prev]);
+          adapted.forEach((e) => e.category && set.add(e.category));
+          return Array.from(set);
+        });
+
         if (typeof hasMoreFromApi === "boolean") {
           setHasMore(hasMoreFromApi);
         } else if (typeof total === "number") {
-          const soFar = isFirstPage ? adapted.length : prevCount(prev => prev) // placeholder
+          const countSoFar = isFirstPage ? adapted.length : (events.length + adapted.length);
+          setHasMore(countSoFar < total);
+        } else {
+          setHasMore(adapted.length === PAGE_SIZE);
         }
       } catch (err) {
-        if (err?.name === "CanceledError" || err?.name === "AbortError") return;
-        setError("Couldn't load events. Please try again.");
+        if (err?.name !== "CanceledError" && err?.name !== "AbortError") {
+          setError("Couldn't load events. Please try again.");
+        }
       } finally {
         setLoading(false);
         setLoadingMore(false);
       }
     }
 
-    // Helper to get current count safely inside setState logic
-    const prevCount = (get) => {
-      // This is never called; defined only to silence lints in the code block above.
-      return 0;
-    };
-
     fetchEvents();
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQ, activeCategory, sortBy, page]);
 
-  // A simpler effect just to compute hasMore correctly after events update
   useEffect(() => {
-    // We cannot know total without API help; assume hasMore until a page returns fewer than PAGE_SIZE
-    // This is refined inside fetch when the API gives explicit pagination
-  }, [events]);
+    if (!userId) return;
+    let ignore = false;
+    (async () => {
+      try {
+        const { data } = await api.get(`/events/user/${userId}/history`, { params: { status: "registered", limit: 200 } });
+        if (ignore || !data) return;
+        const list = Array.isArray(data.results) ? data.results : (Array.isArray(data) ? data : []);
+        const idSet = new Set(list.map((h) => h?.event?._id || h?.event?.id || h?.event));
+        setRegisteredIds(idSet);
+      } catch {}
+    })();
+    return () => { ignore = true; };
+  }, [userId]);
 
-  // Reset to page 1 whenever filters change (except page itself)
   useEffect(() => {
     setPage(1);
   }, [debouncedQ, activeCategory, sortBy]);
 
-  const onRegister = (event) => {
-    console.log("Register clicked:", event.title);
-    alert(`Pretend registered for: ${event.title}`);
+  const onRegister = async (event) => {
+    if (!userId) {
+      navigate("/login");
+      return;
+    }
+    if (event.isPast || registeredIds.has(event.id)) return;
+
+    setRegisteredIds((s) => new Set(s).add(event.id));
+    setEvents((prev) =>
+      prev.map((e) => (e.id === event.id ? { ...e, registeredCount: (e.registeredCount || 0) + 1 } : e))
+    );
+
+    try {
+      await api.post("/events/register", { userId, eventId: event.id });
+    } catch (err) {
+      setRegisteredIds((s) => {
+        const n = new Set(s);
+        n.delete(event.id);
+        return n;
+      });
+      setEvents((prev) =>
+        prev.map((e) => (e.id === event.id ? { ...e, registeredCount: Math.max(0, (e.registeredCount || 1) - 1) } : e))
+      );
+      alert(err?.response?.data?.message || "Registration failed.");
+    }
   };
 
   const loadMore = () => {
     if (!hasMore || loadingMore) return;
     setPage((p) => p + 1);
   };
- const [role] = useState(() => {
-    try {
-      const persistedState = localStorage.getItem('persist:root');
-      if (!persistedState) return null;
 
-      const parsedState = JSON.parse(persistedState);
-      const userState = JSON.parse(parsedState.user);
-
-      return userState.currentUser?.role || null;
-    } catch (err) {
-      console.error("Failed to parse userId from localStorage:", err);
-      return null;
-    }
-  });
-  // IntersectionObserver to auto-load more
   useEffect(() => {
     if (prefersReducedMotion) return;
     const node = loadMoreRef.current;
@@ -381,15 +393,6 @@ const Events = () => {
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, prefersReducedMotion, loadingMore]);
-
-  // Compute categories from current events if the API didn't return any
-  useEffect(() => {
-    setCategories((prev) => {
-      if (prev.length > 1) return prev; // already have server categories
-      const fromEvents = Array.from(new Set(events.map((e) => e.category).filter(Boolean)));
-      return ["All", ...fromEvents];
-    });
-  }, [events]);
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } } };
   const item = { hidden: { opacity: 0, y: 12, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 220, damping: 18 } } };
@@ -404,17 +407,15 @@ const Events = () => {
             <p className="mt-2 text-slate-400">Search, filter and discover everything happening.</p>
           </div>
 
-
-          {role=="moderator"?(<Link
-
-          <Link
-
-            to="/events/create"
-            className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
-          >
-            <PlusIcon className="h-4 w-4" />
-            Create Event
-          </Link>):null}
+          {role === "moderator" ? (
+            <Link
+              to="/events/create"
+              className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
+            >
+              <PlusIcon className="h-4 w-4" />
+              Create Event
+            </Link>
+          ) : null}
         </div>
 
         {/* Sticky Controls */}
@@ -440,15 +441,16 @@ const Events = () => {
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${activeCategory === cat ? "bg-indigo-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-800"
-                    }`}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
+                    activeCategory === cat ? "bg-indigo-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-800"
+                  }`}
                 >
                   {cat}
                 </button>
               ))}
             </div>
 
-            {/* Sort */}
+            {/* Sort (REMOVED 'Upcoming') */}
             <div className="flex items-center gap-2">
               <label className="sr-only" htmlFor="sortBy">Sort events</label>
               <select
@@ -457,7 +459,6 @@ const Events = () => {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
               >
-                <option value="upcoming">Upcoming</option>
                 <option value="popular">Most popular</option>
                 <option value="newest">Newest</option>
                 <option value="capacity">Largest capacity</option>
@@ -476,13 +477,15 @@ const Events = () => {
         ) : events.length === 0 ? (
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
-            <Link
-              to="/events/create"
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-            >
-              <PlusIcon className="h-4 w-4" />
-              Create the first event
-            </Link>
+            {role === "moderator" && (
+              <Link
+                to="/events/create"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Create the first event
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -496,7 +499,11 @@ const Events = () => {
               {events.map((e) => (
                 <motion.div key={e.id} variants={prefersReducedMotion ? undefined : item}>
                   <Link to={`/events/${e.id}`} state={{ event: e }} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:rounded-2xl">
-                    <EventCard event={e} onRegister={onRegister} />
+                    <EventCard
+                      event={e}
+                      onRegister={onRegister}
+                      disabled={registeredIds.has(e.id)}
+                    />
                   </Link>
                 </motion.div>
               ))}
@@ -520,14 +527,16 @@ const Events = () => {
         )}
       </div>
 
-      {/* Floating Create FAB for mobile */}
-      <Link
-        to="/events/create"
-        className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
-        aria-label="Create Event"
-      >
-        <PlusIcon className="h-6 w-6" />
-      </Link>
+      {/* Floating Create FAB for mobile — only moderators */}
+      {role === "moderator" && (
+        <Link
+          to="/events/create"
+          className="fixed bottom-6 right-6 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 p-4 text-white shadow-lg hover:from-indigo-500 hover:to-violet-600 sm:hidden"
+          aria-label="Create Event"
+        >
+          <PlusIcon className="h-6 w-6" />
+        </Link>
+      )}
 
       {/* page bg accents */}
       <div className="pointer-events-none absolute inset-0 -z-10">
