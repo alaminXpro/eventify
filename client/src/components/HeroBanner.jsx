@@ -132,7 +132,7 @@ export default function HeroSection() {
               href="/clubs"
               className="group inline-flex items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-white to-gray-100 px-8 py-4 text-sm font-bold text-gray-900 hover:from-gray-100 hover:to-gray-200 transition-all duration-300 shadow-xl hover:shadow-2xl hover:shadow-white/20 transform hover:-translate-y-1"
             >
-              EXPLORE EVENTS & CLUBS
+              EXPLORE CLUBS
               <svg
                 width="18"
                 height="18"
@@ -144,25 +144,7 @@ export default function HeroSection() {
               </svg>
             </a>
 
-            <a
-              href="/admin"
-              className="group inline-flex items-center justify-center gap-2 rounded-xl border-2 border-sky-400/50 bg-sky-400/10 backdrop-blur-sm px-8 py-4 text-sm font-semibold text-sky-300 hover:text-white hover:border-sky-300 hover:bg-sky-400/20 transition-all duration-300"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="transition-transform duration-300 group-hover:rotate-12"
-              >
-                <path
-                  d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-              </svg>
-              Admin Dashboard
-            </a>
+
           </div>
 
           {/* Stats */}

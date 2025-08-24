@@ -20,10 +20,42 @@ const ApiError = require('../utils/ApiError');
  * @param {Object} eventBody
  * @returns {Promise<Event>}
  */
+// const createEvent = async (eventBody) => {
+//   if (await Event.isEventExists(eventBody.title)) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, 'Event title already exists');
+//   }
+//   return Event.create(eventBody);
+// };
+function parseTimeRange(timeRange) {
+  const [start, end] = timeRange.split('-').map(t => t.trim());
+  return { start, end };
+}
 const createEvent = async (eventBody) => {
+
   if (await Event.isEventExists(eventBody.title)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Event title already exists');
   }
+
+
+  const { start: newStart, end: newEnd } = parseTimeRange(eventBody.event_time_duration);
+
+
+  const conflictEvent = await Event.findOne({
+    location: eventBody.location,
+    event_date: eventBody.event_date,
+  });
+
+  if (conflictEvent) {
+    const { start: existingStart, end: existingEnd } = parseTimeRange(conflictEvent.event_time_duration);
+
+    if (newStart < existingEnd && newEnd > existingStart) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Another event is already scheduled at ${eventBody.location} (${conflictEvent.event_time_duration})`
+      );
+    }
+  }
+
   return Event.create(eventBody);
 };
 
@@ -167,7 +199,7 @@ const registerEvent = async (userId, eventId) => {
   }
 
   // Check if EventRecommendation already exists
-{/*}  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
+  {/*}  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
   if (recommendationExists) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Recommendation data already exists for this event');
   }*/}
@@ -204,40 +236,42 @@ const registerEvent = async (userId, eventId) => {
     preferred_event_category: user.preferences?.preferredEventCategory || [],
     registered_at: new Date(),
   };
+  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
+  if (!recommendationExists) {
+    try {
+      // Create the registration record
+      const registration = await StudentEventHistory.create({
+        user: userId,
+        event: eventId,
+        status: 'registered',
+        registered_at: new Date(),
+      });
+      await EventRecommendation.create(recommendationData);
 
-  try {
-    // Create the registration record
-    const registration = await StudentEventHistory.create({
-      user: userId,
-      event: eventId,
-      status: 'registered',
-      registered_at: new Date(),
-    });
 
-    // Create the recommendation record
-    await EventRecommendation.create(recommendationData);
 
-    // Increment the event's registration count
-    await updateEventRegistrations(eventId, 1);
+      // Increment the event's registration count
+      await updateEventRegistrations(eventId, 1);
 
-    return registration;
-  } catch (error) {
-    // If EventRecommendation creation fails, we should still allow registration
-    // but log the error for debugging
-    console.error('Failed to create EventRecommendation:', error);
+      return registration;
+    } catch (error) {
+      // If EventRecommendation creation fails, we should still allow registration
+      // but log the error for debugging
+      console.error('Failed to create EventRecommendation:', error);
 
-    // Create the registration record anyway
-    const registration = await StudentEventHistory.create({
-      user: userId,
-      event: eventId,
-      status: 'registered',
-      registered_at: new Date(),
-    });
+      // Create the registration record anyway
+      const registration = await StudentEventHistory.create({
+        user: userId,
+        event: eventId,
+        status: 'registered',
+        registered_at: new Date(),
+      });
 
-    // Increment the event's registration count
-    await updateEventRegistrations(eventId, 1);
+      // Increment the event's registration count
+      await updateEventRegistrations(eventId, 1);
 
-    return registration;
+      return registration;
+    }
   }
 };
 

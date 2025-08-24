@@ -74,13 +74,24 @@ export default function Navbar() {
     }
   };
 
-    const headerClass = scrolled
-        ? "bg-[#0f172a] backdrop-blur-xl border-b border-white/10 shadow-lg"
-        : "bg-[#0f172a] backdrop-blur-md border-b border-white/10";
+  const headerClass = scrolled
+    ? "bg-[#0f172a] backdrop-blur-xl border-b border-white/10 shadow-lg"
+    : "bg-[#0f172a] backdrop-blur-md border-b border-white/10";
 
   const baseLink =
     "px-3 py-2 rounded-md text-gray-200 hover:text-white hover:bg-white/10 transition";
   const activeLink = "text-white bg-white/10";
+
+  const actoken = (() => {
+    try {
+      const persisted = localStorage.getItem("accessToken");
+      if (!persisted) return null;
+      return persisted
+    } catch {
+      return null;
+    }
+  })();
+
 
   return (
     <header className={`sticky top-0 z-50 h-16 transition-colors duration-300 ${headerClass}`}>
@@ -108,9 +119,8 @@ export default function Navbar() {
             <button
               ref={clubsBtnRef}
               onClick={() => setClubsOpen((v) => !v)}
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md transition hover:bg-white/10 ${
-                clubsOpen ? "bg-white/10 text-sky-300" : "text-gray-200 hover:text-white"
-              }`}
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md transition hover:bg-white/10 ${clubsOpen ? "bg-white/10 text-sky-300" : "text-gray-200 hover:text-white"
+                }`}
             >
               Clubs
               <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" className={`transition-transform ${clubsOpen ? "rotate-180" : ""}`}>
@@ -237,8 +247,8 @@ export default function Navbar() {
                     <NavLink to="/clubs" className="rounded-md px-3 py-2 text-sm text-sky-300 hover:bg-white/10">View All Clubs →</NavLink>
                   </div>
                 </details>
-                <NavLink to="/about" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
-                  About Us
+                <NavLink to="/events" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                  Events
                 </NavLink>
                 <NavLink to="/events" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
                   Events

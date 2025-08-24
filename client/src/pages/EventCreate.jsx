@@ -16,6 +16,57 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
+/* ===================== Cloudinary env (Vite) ===================== */
+const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UNSIGNED_PRESET; // unsigned preset name
+const UPLOAD_FOLDER = import.meta.env.VITE_CLOUDINARY_UPLOAD_FOLDER || ""; // optional folder
+
+/* Upload helper (unsigned) */
+async function uploadToCloudinary(file, onProgress) {
+  if (!file) throw new Error("No file selected");
+  if (!CLOUD_NAME || !UPLOAD_PRESET) {
+    throw new Error(
+      "Missing Cloudinary env vars. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UNSIGNED_PRESET."
+    );
+  }
+
+  // small guardrails
+  const okTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+  if (!okTypes.includes(file.type)) throw new Error("Only JPG/PNG/WEBP allowed");
+  if (file.size > 5 * 1024 * 1024) throw new Error("Max size 5MB");
+
+  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const form = new FormData();
+  form.append("file", file);
+  form.append("upload_preset", UPLOAD_PRESET);
+  if (UPLOAD_FOLDER) form.append("folder", UPLOAD_FOLDER);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.onload = () => {
+      try {
+        const res = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(res.secure_url); // final https url
+        } else {
+          reject(new Error(res?.error?.message || "Cloudinary upload failed"));
+        }
+      } catch {
+        reject(new Error("Cloudinary response parse error"));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error uploading to Cloudinary"));
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && typeof onProgress === "function") {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.send(form);
+  });
+}
+
+/* ===================== Constants ===================== */
 const SKILLS_ENUM_FALLBACK = [
   // Technical
   "Programming",
@@ -84,7 +135,7 @@ const SKILLS_ENUM_FALLBACK = [
   "Social Impact",
   "Environmental Awareness",
   "Diversity & Inclusion",
-  "Community Building"
+  "Community Building",
 ];
 
 const CATEGORIES = [
@@ -108,13 +159,16 @@ function Chip({ selected, onClick, children }) {
       type="button"
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors border
-        ${selected ? "bg-indigo-600 text-white border-indigo-600" : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-slate-800"}`}
+        ${
+          selected
+            ? "bg-indigo-600 text-white border-indigo-600"
+            : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-slate-800"
+        }`}
     >
       {children}
     </button>
   );
 }
-
 Chip.propTypes = {
   selected: PropTypes.bool.isRequired,
   onClick: PropTypes.func.isRequired,
@@ -137,7 +191,6 @@ function TagInput({ value, onChange, placeholder = "Type and press Enter" }) {
     onChange(next);
   };
 
-  
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-2">
@@ -177,7 +230,6 @@ function TagInput({ value, onChange, placeholder = "Type and press Enter" }) {
     </div>
   );
 }
-
 TagInput.propTypes = {
   value: PropTypes.arrayOf(PropTypes.string).isRequired,
   onChange: PropTypes.func.isRequired,
@@ -187,20 +239,19 @@ TagInput.propTypes = {
 /* ---------------------------------- Page --------------------------------- */
 export default function EventCreate() {
   const navigate = useNavigate();
+
   const [userId] = useState(() => {
     try {
-      const persistedState = localStorage.getItem('persist:root');
+      const persistedState = localStorage.getItem("persist:root");
       if (!persistedState) return null;
-
       const parsedState = JSON.parse(persistedState);
       const userState = JSON.parse(parsedState.user);
-
       return userState.currentUser?.id || null;
-    } catch (err) {
-      console.error("Failed to parse userId from localStorage:", err);
+    } catch {
       return null;
     }
   });
+
   // Form state mapped 1:1 with your schema (names matter!)
   const [form, setForm] = useState({
     title: "",
@@ -218,10 +269,12 @@ export default function EventCreate() {
     media_links: [], // optional links, keep as strings
   });
 
-  // Single required image file (not a link)
+  // Image state
   const [eventImageFile, setEventImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [uploadPct, setUploadPct] = useState(0);
 
+  // Misc UI state
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [clubs, setClubs] = useState([]);
@@ -232,28 +285,22 @@ export default function EventCreate() {
     const fetchClubs = async () => {
       try {
         setLoadingClubs(true);
-        const response = await axiosInstance.get('/clubs', {
-          params: { limit: 100 } // Get up to 100 clubs
-        });
-        const allClubs = response.data.results || []
-        const myModeratorClubs = allClubs.filter(club =>
-          club.moderators.some(moderatorId => moderatorId === userId)
+        const response = await axiosInstance.get("/clubs", { params: { limit: 100 } });
+        const allClubs = response.data.results || [];
+        const myModeratorClubs = allClubs.filter((club) =>
+          club.moderators.some((moderatorId) => moderatorId === userId)
         );
-
         setClubs(myModeratorClubs);
       } catch (error) {
-        console.error('Failed to fetch clubs:', error);
-        setErrors(prev => ({ ...prev, clubs: 'Failed to load clubs' }));
+        setErrors((prev) => ({ ...prev, clubs: "Failed to load clubs" }));
       } finally {
         setLoadingClubs(false);
       }
     };
-
     fetchClubs();
-  }, []);
+  }, [userId]);
 
   const skillsList = SKILLS_ENUM_FALLBACK;
-
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleSkill = (skill) => {
@@ -261,9 +308,7 @@ export default function EventCreate() {
       const exists = f.skills_offered.includes(skill);
       return {
         ...f,
-        skills_offered: exists
-          ? f.skills_offered.filter((s) => s !== skill)
-          : [...f.skills_offered, skill],
+        skills_offered: exists ? f.skills_offered.filter((s) => s !== skill) : [...f.skills_offered, skill],
       };
     });
   };
@@ -273,11 +318,12 @@ export default function EventCreate() {
     if (!file) {
       setEventImageFile(null);
       setImagePreview("");
+      setUploadPct(0);
       return;
     }
     setEventImageFile(file);
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
+    setImagePreview(URL.createObjectURL(file)); // local preview
+    setUploadPct(0);
   };
 
   const validate = () => {
@@ -306,20 +352,18 @@ export default function EventCreate() {
     if (!validate()) return;
 
     setSubmitting(true);
-    try {
-      // Since the server expects event_image as a URL string, we'll use a placeholder
-      // In a real implementation, you would upload the image to cloudinary first
-      // and get the URL, then use that URL
-      const imageUrl = eventImageFile 
-        ? "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60" 
-        : "";
+    setUploadPct(0);
 
-      // Prepare event data according to server validation schema
+    try {
+      // 1) Upload image to Cloudinary and get https URL
+      const imageUrl = await uploadToCloudinary(eventImageFile, setUploadPct);
+
+      // 2) Send payload to backend
       const eventData = {
         title: form.title,
         event_description: form.event_description,
         category: form.category,
-        event_image: imageUrl,
+        event_image: imageUrl, // <- real Cloudinary URL
         club_hosting: form.club_hosting,
         event_date: form.event_date,
         event_time_duration: form.event_time_duration,
@@ -330,16 +374,13 @@ export default function EventCreate() {
         skills_offered: form.skills_offered,
         topics: form.topics,
         media_links: form.media_links,
-        // event_status is not included - server will default to 'unpublished'
+        // server will default event_status to 'unpublished'
       };
 
-      console.log('Submitting event data:', eventData); // Debug log to verify data
-      
-      const res = await axiosInstance.post('/events', eventData);
-
+      const res = await axiosInstance.post("/events", eventData);
       navigate(`/events/${res.data._id || res.data.id}`, { state: { event: res.data } });
     } catch (err) {
-      const msg = err?.response?.data?.message || "Failed to create event";
+      const msg = err?.response?.data?.message || err?.message || "Failed to create event";
       setErrors((prev) => ({ ...prev, submit: msg }));
     } finally {
       setSubmitting(false);
@@ -405,35 +446,44 @@ export default function EventCreate() {
             {/* Image Upload (required) */}
             <div>
               <label className="mb-1 block text-sm font-semibold">Event Image *</label>
-              <div className={`rounded-xl border ${errors.event_image ? "border-rose-500" : "border-slate-700/60"} bg-slate-900/60 p-4`}>
+              <div
+                className={`rounded-xl border ${
+                  errors.event_image ? "border-rose-500" : "border-slate-700/60"
+                } bg-slate-900/60 p-4`}
+              >
                 <div className="flex items-center justify-between gap-4">
                   <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-700/60 px-4 py-2 hover:bg-slate-800/60">
                     <Upload className="h-4 w-4 text-indigo-300" />
                     <span className="text-sm">Choose file</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      onChange={onPickImage}
-                    />
+                    <input type="file" accept="image/*" hidden onChange={onPickImage} />
                   </label>
                   <span className="truncate text-xs text-slate-400">
                     {eventImageFile ? eventImageFile.name : "No file selected"}
                   </span>
                 </div>
+
                 {imagePreview && (
                   <div className="mt-3">
-                    <img
-                      src={imagePreview}
-                      alt="preview"
-                      className="h-40 w-full rounded-lg object-cover"
-                    />
+                    <img src={imagePreview} alt="preview" className="h-40 w-full rounded-lg object-cover" />
+                  </div>
+                )}
+
+                {/* progress bar */}
+                {uploadPct > 0 && (
+                  <div className="mt-3">
+                    <div className="h-2 w-full overflow-hidden rounded bg-slate-800/60">
+                      <div
+                        className="h-2 bg-gradient-to-r from-indigo-500 to-violet-500"
+                        style={{ width: `${uploadPct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {uploadPct < 100 ? `${uploadPct}% uploading…` : "Upload complete ✓"}
+                    </p>
                   </div>
                 )}
               </div>
-              {errors.event_image && (
-                <p className="mt-1 text-xs text-rose-400">{errors.event_image}</p>
-              )}
+              {errors.event_image && <p className="mt-1 text-xs text-rose-400">{errors.event_image}</p>}
             </div>
 
             {/* Category / Club */}
@@ -467,21 +517,15 @@ export default function EventCreate() {
                     errors.club_hosting ? "border-rose-500" : "border-slate-700/60"
                   }`}
                 >
-                  <option value="">
-                    {loadingClubs ? "Loading clubs..." : "Select a club"}
-                  </option>
+                  <option value="">{loadingClubs ? "Loading clubs..." : "Select a club"}</option>
                   {clubs.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} 
+                      {c.name}
                     </option>
                   ))}
                 </select>
-                {errors.club_hosting && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.club_hosting}</p>
-                )}
-                {errors.clubs && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.clubs}</p>
-                )}
+                {errors.club_hosting && <p className="mt-1 text-xs text-rose-400">{errors.club_hosting}</p>}
+                {errors.clubs && <p className="mt-1 text-xs text-rose-400">{errors.clubs}</p>}
               </div>
             </div>
 
@@ -500,9 +544,7 @@ export default function EventCreate() {
                     errors.event_date ? "border-rose-500" : "border-slate-700/60"
                   }`}
                 />
-                {errors.event_date && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.event_date}</p>
-                )}
+                {errors.event_date && <p className="mt-1 text-xs text-rose-400">{errors.event_date}</p>}
               </div>
 
               <div>
@@ -524,9 +566,7 @@ export default function EventCreate() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-semibold">
-                  Registration Deadline *
-                </label>
+                <label className="mb-1 block text-sm font-semibold">Registration Deadline *</label>
                 <input
                   type="date"
                   value={form.registration_deadline}
@@ -548,7 +588,7 @@ export default function EventCreate() {
                   <MapPin className="mr-1 inline h-4 w-4 text-indigo-300" />
                   Location *
                 </label>
-                <input
+                <select
                   value={form.location}
                   onChange={(e) => setField("location", e.target.value)}
                   placeholder="e.g., Main Auditorium"
@@ -556,10 +596,9 @@ export default function EventCreate() {
                     errors.location ? "border-rose-500" : "border-slate-700/60"
                   }`}
                 />
-                {errors.location && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.location}</p>
-                )}
+                {errors.location && <p className="mt-1 text-xs text-rose-400">{errors.location}</p>}
               </div>
+
 
               <div>
                 <label className="mb-1 block text-sm font-semibold">
@@ -575,9 +614,7 @@ export default function EventCreate() {
                     errors.capacity ? "border-rose-500" : "border-slate-700/60"
                   }`}
                 />
-                {errors.capacity && (
-                  <p className="mt-1 text-xs text-rose-400">{errors.capacity}</p>
-                )}
+                {errors.capacity && <p className="mt-1 text-xs text-rose-400">{errors.capacity}</p>}
               </div>
             </div>
 
@@ -586,18 +623,12 @@ export default function EventCreate() {
               <label className="mb-1 block text-sm font-semibold">Event Type *</label>
               <div className="flex flex-wrap gap-2">
                 {EVENT_TYPES.map((t, index) => (
-                  <Chip
-                    key={`event-type-${index}-${t}`}
-                    selected={form.event_type === t}
-                    onClick={() => setField("event_type", t)}
-                  >
+                  <Chip key={`event-type-${index}-${t}`} selected={form.event_type === t} onClick={() => setField("event_type", t)}>
                     {t}
                   </Chip>
                 ))}
               </div>
-              {errors.event_type && (
-                <p className="mt-1 text-xs text-rose-400">{errors.event_type}</p>
-              )}
+              {errors.event_type && <p className="mt-1 text-xs text-rose-400">{errors.event_type}</p>}
             </div>
 
             {/* Skills Offered */}
@@ -609,59 +640,43 @@ export default function EventCreate() {
                   <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Technical</h4>
                   <div className="flex flex-wrap gap-2">
                     {skillsList.slice(0, 16).map((s, index) => (
-                      <Chip
-                        key={`skill-${index}-${s}`}
-                        selected={form.skills_offered.includes(s)}
-                        onClick={() => toggleSkill(s)}
-                      >
+                      <Chip key={`skill-${index}-${s}`} selected={form.skills_offered.includes(s)} onClick={() => toggleSkill(s)}>
                         {s}
                       </Chip>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Professional & Career */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Professional & Career</h4>
                   <div className="flex flex-wrap gap-2">
                     {skillsList.slice(16, 26).map((s, index) => (
-                      <Chip
-                        key={`skill-${index + 16}-${s}`}
-                        selected={form.skills_offered.includes(s)}
-                        onClick={() => toggleSkill(s)}
-                      >
+                      <Chip key={`skill-${index + 16}-${s}`} selected={form.skills_offered.includes(s)} onClick={() => toggleSkill(s)}>
                         {s}
                       </Chip>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Creative & Cultural */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Creative & Cultural</h4>
                   <div className="flex flex-wrap gap-2">
                     {skillsList.slice(26, 37).map((s, index) => (
-                      <Chip
-                        key={`skill-${index + 26}-${s}`}
-                        selected={form.skills_offered.includes(s)}
-                        onClick={() => toggleSkill(s)}
-                      >
+                      <Chip key={`skill-${index + 26}-${s}`} selected={form.skills_offered.includes(s)} onClick={() => toggleSkill(s)}>
                         {s}
                       </Chip>
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Business & Other */}
                 <div>
                   <h4 className="mb-2 text-xs font-medium text-slate-400 uppercase tracking-wide">Business & Others</h4>
                   <div className="flex flex-wrap gap-2">
                     {skillsList.slice(37).map((s, index) => (
-                      <Chip
-                        key={`skill-${index + 37}-${s}`}
-                        selected={form.skills_offered.includes(s)}
-                        onClick={() => toggleSkill(s)}
-                      >
+                      <Chip key={`skill-${index + 37}-${s}`} selected={form.skills_offered.includes(s)} onClick={() => toggleSkill(s)}>
                         {s}
                       </Chip>
                     ))}
@@ -675,27 +690,17 @@ export default function EventCreate() {
               <label className="mb-2 block text-sm font-semibold">
                 Topics <Hash className="ml-1 inline h-4 w-4 text-indigo-300" />
               </label>
-              <TagInput
-                value={form.topics}
-                onChange={(v) => setField("topics", v)}
-                placeholder="Add a topic and press Enter"
-              />
+              <TagInput value={form.topics} onChange={(v) => setField("topics", v)} placeholder="Add a topic and press Enter" />
             </div>
 
             {/* Media Links (optional) */}
             <div>
               <label className="mb-1 block text-sm font-semibold">Media Links (optional)</label>
-              <SmallListEditor
-                value={form.media_links}
-                onChange={(v) => setField("media_links", v)}
-                placeholder="https://example.com/photo-or-video"
-              />
+              <SmallListEditor value={form.media_links} onChange={(v) => setField("media_links", v)} placeholder="https://example.com/photo-or-video" />
             </div>
 
             {errors.submit && (
-              <div className="rounded-xl border border-rose-500/30 bg-rose-900/20 p-3 text-sm text-rose-200">
-                {errors.submit}
-              </div>
+              <div className="rounded-xl border border-rose-500/30 bg-rose-900/20 p-3 text-sm text-rose-200">{errors.submit}</div>
             )}
 
             <div className="flex items-center justify-end gap-3">
@@ -717,27 +722,17 @@ export default function EventCreate() {
           </motion.form>
 
           {/* Live Preview Card */}
-          <motion.aside
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25, delay: 0.05 }}
-            className="md:sticky md:top-8"
-          >
+          <motion.aside initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: 0.05 }} className="md:sticky md:top-8">
             <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/60 shadow-lg">
               <div className="h-44 w-full overflow-hidden">
                 <img
-                  src={
-                    imagePreview ||
-                    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60"
-                  }
+                  src={imagePreview || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60"}
                   alt="preview"
                   className="h-full w-full object-cover"
                 />
               </div>
               <div className="p-4">
-                <h3 className="line-clamp-2 text-lg font-bold">
-                  {form.title || "Your Event Title"}
-                </h3>
+                <h3 className="line-clamp-2 text-lg font-bold">{form.title || "Your Event Title"}</h3>
                 <div className="mt-2 space-y-1 text-xs text-slate-300">
                   <div className="flex items-center gap-2">
                     <CalendarDays className="h-4 w-4 text-indigo-300" />
@@ -756,7 +751,7 @@ export default function EventCreate() {
                   {form.club_hosting && (
                     <div className="flex items-center gap-2">
                       <span className="text-indigo-300">🏛️</span>
-                      <span>{clubs.find(c => c.id === form.club_hosting)?.name || "Selected Club"}</span>
+                      <span>{clubs.find((c) => c.id === form.club_hosting)?.name || "Selected Club"}</span>
                     </div>
                   )}
                 </div>
@@ -774,18 +769,11 @@ export default function EventCreate() {
                     </div>
                   </div>
                 )}
-                {form.event_description && (
-                  <p className="mt-3 line-clamp-3 text-sm text-slate-300">
-                    {form.event_description}
-                  </p>
-                )}
+                {form.event_description && <p className="mt-3 line-clamp-3 text-sm text-slate-300">{form.event_description}</p>}
                 {form.skills_offered.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {form.skills_offered.slice(0, 5).map((s, index) => (
-                      <span
-                        key={`preview-skill-${index}-${s}`}
-                        className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px]"
-                      >
+                      <span key={`preview-skill-${index}-${s}`} className="inline-flex items-center gap-1 rounded-full border border-slate-700 bg-slate-900 px-2 py-1 text-[10px]">
                         <CheckCircle2 className="h-3 w-3 text-emerald-400" />
                         {s}
                       </span>
@@ -830,19 +818,10 @@ function SmallListEditor({ value, onChange, placeholder }) {
             key={`${u}-${i}`}
             className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm"
           >
-            <a
-              href={u}
-              target="_blank"
-              rel="noreferrer"
-              className="truncate underline decoration-slate-500 hover:text-indigo-300"
-            >
+            <a href={u} target="_blank" rel="noreferrer" className="truncate underline decoration-slate-500 hover:text-indigo-300">
               {u}
             </a>
-            <button
-              type="button"
-              className="text-slate-400 hover:text-slate-200"
-              onClick={() => remove(i)}
-            >
+            <button type="button" className="text-slate-400 hover:text-slate-200" onClick={() => remove(i)}>
               Remove
             </button>
           </div>
@@ -856,18 +835,13 @@ function SmallListEditor({ value, onChange, placeholder }) {
           className="flex-1 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
           placeholder={placeholder}
         />
-        <button
-          type="button"
-          onClick={add}
-          className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700"
-        >
+        <button type="button" onClick={add} className="rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">
           Add
         </button>
       </div>
     </div>
   );
 }
-
 SmallListEditor.propTypes = {
   value: PropTypes.arrayOf(PropTypes.string),
   onChange: PropTypes.func.isRequired,

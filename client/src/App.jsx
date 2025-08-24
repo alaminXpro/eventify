@@ -14,7 +14,7 @@ import EventCreate from "./pages/EventCreate";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import EditProfile from "./pages/EditProfile";
-
+import EventFAQPage from "./pages/FAQ";
 // Clubs
 import JoinClub from "./pages/JoinClub";
 import MyClubs from "./pages/MyClubs";
@@ -79,6 +79,11 @@ function App() {
             <EditProfile />
           </PrivateRoute>
         } />
+        <Route path="/faq" element={<EventFAQPage />} />
+        {/* Student */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/profile/edit" element={<EditProfile />} />
 
         {/* Clubs */}
         <Route path="/clubs" element={<Clubs />} />
