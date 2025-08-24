@@ -76,6 +76,24 @@ const userSlice = createSlice({
       state.error = action.payload;
       state.loading = false;
     },
+    validateSessionStart: (state) => {
+      // Don't set loading to true for background validation
+      state.error = null;
+    },
+    validateSessionSuccess: (state, action) => {
+      // Update user data if it has changed
+      if (action.payload.user) {
+        state.currentUser = action.payload.user;
+      }
+      state.error = null;
+    },
+    validateSessionFailure: (state) => {
+      // Session is invalid, sign out the user
+      state.currentUser = null;
+      state.error = null;
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    },
   },
 });
 
@@ -92,6 +110,9 @@ export const {
   signOutUserFailure,
   signOutUserSuccess,
   signOutUserStart,
+  validateSessionStart,
+  validateSessionSuccess,
+  validateSessionFailure,
 } = userSlice.actions;
 
 export default userSlice.reducer;

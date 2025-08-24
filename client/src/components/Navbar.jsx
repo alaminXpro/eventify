@@ -1,20 +1,30 @@
 // src/components/Navbar.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useSelector, useDispatch } from "react-redux";
+import { signOutUserStart, signOutUserSuccess } from "../redux/user/userSlice";
+import { LogOut, User } from "lucide-react";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [clubsOpen, setClubsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const clubsBtnRef = useRef(null);
   const clubsMenuRef = useRef(null);
+  const profileBtnRef = useRef(null);
+  const profileMenuRef = useRef(null);
   const location = useLocation();
+  
+  const { currentUser } = useSelector(state => state.user);
+  const dispatch = useDispatch();
 
   // Close dropdowns on route change
   useEffect(() => {
     setClubsOpen(false);
     setMobileOpen(false);
+    setProfileOpen(false);
   }, [location.pathname]);
 
   // Scroll state for stronger backdrop
@@ -31,11 +41,38 @@ export default function Navbar() {
       if (e.key === "Escape") {
         setClubsOpen(false);
         setMobileOpen(false);
+        setProfileOpen(false);
       }
     };
     document.addEventListener("keydown", onEsc);
     return () => document.removeEventListener("keydown", onEsc);
   }, []);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      dispatch(signOutUserStart());
+      
+      // Call logout endpoint if needed
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (refreshToken) {
+        await fetch(`${import.meta.env.VITE_API_BASE || 'http://localhost:3000/v1'}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ refreshToken }),
+        });
+      }
+      
+      dispatch(signOutUserSuccess());
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still sign out locally even if server call fails
+      dispatch(signOutUserSuccess());
+    }
+  };
 
     const headerClass = scrolled
         ? "bg-[#0f172a] backdrop-blur-xl border-b border-white/10 shadow-lg"
@@ -86,13 +123,13 @@ export default function Navbar() {
                 ref={clubsMenuRef}
                 className="absolute left-0 mt-2 w-56 rounded-lg border border-white/10 bg-[#001f3f]/95 backdrop-blur-xl p-2 shadow-xl"
               >
-                <NavLink to="/clubs/tech" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
+                <NavLink to="/clubs/" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
                   Tech Club
                 </NavLink>
-                <NavLink to="/clubs/cultural" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
+                <NavLink to="/clubs/" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
                   Cultural Club
                 </NavLink>
-                <NavLink to="/clubs/sports" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
+                <NavLink to="/clubs/" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
                   Sports Club
                 </NavLink>
                 <div className="my-2 h-px bg-white/10" />
@@ -104,15 +141,59 @@ export default function Navbar() {
           </li>
 
           <li><NavLink to="/events" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Events</NavLink></li>
-          <li><NavLink to="/dashboard" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Dashboard</NavLink></li>
-          <li><NavLink to="/profile" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Profile</NavLink></li>
+          {currentUser && (
+            <>
+              <li><NavLink to="/dashboard" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Dashboard</NavLink></li>
+              <li><NavLink to="/profile" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Profile</NavLink></li>
+            </>
+          )}
         </ul>
 
         {/* Right desktop actions */}
         <div className="ml-auto hidden md:flex items-center gap-2">
-          <Link to="/login" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
-            Login
-          </Link>
+          {currentUser ? (
+            <div className="relative">
+              <button
+                ref={profileBtnRef}
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-medium text-white hover:bg-white/20 transition"
+              >
+                <User className="h-4 w-4" />
+                {currentUser.name || 'User'}
+              </button>
+              
+              {profileOpen && (
+                <div
+                  ref={profileMenuRef}
+                  className="absolute right-0 mt-2 w-48 rounded-lg border border-white/10 bg-[#001f3f]/95 backdrop-blur-xl p-2 shadow-xl z-50"
+                >
+                  <NavLink to="/profile" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
+                    Profile
+                  </NavLink>
+                  <NavLink to="/dashboard" className="block rounded-md px-3 py-2 text-sm text-gray-200 hover:bg-white/10 hover:text-white">
+                    Dashboard
+                  </NavLink>
+                  <div className="my-2 h-px bg-white/10" />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left rounded-md px-3 py-2 text-sm text-red-300 hover:bg-red-500/10 hover:text-red-200 flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <Link to="/login" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
+                Login
+              </Link>
+              <Link to="/signup" className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                Sign Up
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -159,18 +240,46 @@ export default function Navbar() {
                 <NavLink to="/about" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
                   About Us
                 </NavLink>
-                <NavLink to="/dashboard" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
-                  Dashboard
+                <NavLink to="/events" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                  Events
                 </NavLink>
-                <NavLink to="/profile" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
-                  Profile
-                </NavLink>
+                {currentUser && (
+                  <>
+                    <NavLink to="/dashboard" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                      Dashboard
+                    </NavLink>
+                    <NavLink to="/profile" className={({ isActive }) => `rounded-md px-3 py-2 ${isActive ? "bg-white/10 text-white" : "text-gray-200 hover:bg-white/10 hover:text-white"}`}>
+                      Profile
+                    </NavLink>
+                  </>
+                )}
               </div>
 
               <div className="mt-3">
-                <Link to="/login" className="inline-flex items-center gap-2 rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
-                  Login
-                </Link>
+                {currentUser ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm text-white">
+                      <User className="h-4 w-4" />
+                      {currentUser.name || 'User'}
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left rounded-md bg-red-600 hover:bg-red-700 px-4 py-2 text-sm font-semibold text-white transition flex items-center gap-2"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Link to="/login" className="block w-full text-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-100 transition">
+                      Login
+                    </Link>
+                    <Link to="/signup" className="block w-full text-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition">
+                      Sign Up
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -10,7 +10,7 @@ import {
   Star,
   Sparkles,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import {
   signInStart,
@@ -25,6 +25,7 @@ export default function EventifyLogin() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const { loading, error } = useSelector((state) => state.user);
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const API_BASE = import.meta.env.VITE_API_BASE;
 
@@ -84,7 +85,10 @@ export default function EventifyLogin() {
       });
 
       dispatch(signInSuccess(res.data));
-      navigate("/dashboard");
+      
+      // Redirect to the intended page or dashboard
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
     } catch (error) {
       console.error("Google sign-in error:", error);
       dispatch(signInFailure(error.response.data.message));
@@ -140,7 +144,10 @@ export default function EventifyLogin() {
         sameSite: "none",
       });
       dispatch(signInSuccess(res.data));
-      navigate("/dashboard");
+      
+      // Redirect to the intended page or dashboard
+      const from = location.state?.from?.pathname || "/dashboard";
+      navigate(from, { replace: true });
     } catch (error) {
       console.error("Login error:", error);
       const errorMessage =

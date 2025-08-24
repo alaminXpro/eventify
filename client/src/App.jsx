@@ -18,37 +18,81 @@ import EditProfile from "./pages/EditProfile";
 // Clubs
 import JoinClub from "./pages/JoinClub";
 import MyClubs from "./pages/MyClubs";
+import Clubs from "./pages/Clubs";
+
+// Components
+import PrivateRoute from "./components/PrivateRoute";
+import AuthRedirect from "./components/AuthRedirect";
+
+// Hooks
+import useSessionValidation from "./hooks/useSessionValidation";
+
 // If/when you add a clubs listing page, import it and wire it below
 // import Clubs from "./pages/Clubs";
 
 function App() {
+  // Set up periodic session validation (every 5 minutes)
+  // Only runs when user is logged in
+  useSessionValidation(1);
+
   return (
   <>
     <Layout>
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={
+          <AuthRedirect>
+            <Login />
+          </AuthRedirect>
+        } />
         {/* Use /signup as canonical so Layout's hide rule works */}
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/signup" element={
+          <AuthRedirect>
+            <Signup />
+          </AuthRedirect>
+        } />
         <Route path="/register" element={<Navigate to="/signup" replace />} />
 
         {/* Events */}
         <Route path="/events" element={<Events />} />
-        <Route path="/events/create" element={<EventCreate />} />
+        <Route path="/events/create" element={
+          <PrivateRoute>
+            <EventCreate />
+          </PrivateRoute>
+        } />
         <Route path="/events/:id" element={<EventDetails />} />
 
-        {/* Student */}
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/profile/edit" element={<EditProfile />} />
+        {/* Protected User Routes */}
+        <Route path="/dashboard" element={
+          <PrivateRoute>
+            <Dashboard />
+          </PrivateRoute>
+        } />
+        <Route path="/profile" element={
+          <PrivateRoute>
+            <Profile />
+          </PrivateRoute>
+        } />
+        <Route path="/profile/edit" element={
+          <PrivateRoute>
+            <EditProfile />
+          </PrivateRoute>
+        } />
 
         {/* Clubs */}
-        {/* If you add a clubs list page later: <Route path="/clubs" element={<Clubs />} /> */}
-        <Route path="/clubs/join" element={<JoinClub />} />
-        <Route path="/clubs/my" element={<MyClubs />} />
+        <Route path="/clubs" element={<Clubs />} />
+        <Route path="/clubs/join" element={
+          <PrivateRoute>
+            <JoinClub />
+          </PrivateRoute>
+        } />
+        <Route path="/clubs/my" element={
+          <PrivateRoute>
+            <MyClubs />
+          </PrivateRoute>
+        } />
         {/* Aliases / convenience redirects */}
-        <Route path="/clubs" element={<Navigate to="/clubs/join" replace />} />
         <Route path="/join" element={<Navigate to="/clubs/join" replace />} />
         <Route path="/my-clubs" element={<Navigate to="/clubs/my" replace />} />
 
