@@ -32,6 +32,16 @@ const getClub = catchAsync(async (req, res) => {
   res.send(club);
 });
 
+// Join club
+const joinClub = catchAsync(async (req, res) => {
+  const { clubId } = req.body;
+  const userId = req.user.id;
+  const club = await clubService.addUserToPendingList(clubId, userId);
+  res.send({
+    message: `Request to join club '${club.name}' was successful.`
+  });
+});
+
 const getPendingMembers = catchAsync(async (req, res) => {
   const { clubId } = req.params;
   const { moderatorId } = req.body;
@@ -111,6 +121,7 @@ module.exports = {
   createClub,
   getClubs,
   getClub,
+  joinClub,
   updateClub,
   deleteClub,
   addModeratorToClub,

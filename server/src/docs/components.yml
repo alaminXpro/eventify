@@ -47,6 +47,49 @@ components:
         message:
           type: string
 
+    Club:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        logo:
+          type: string
+        website:
+          type: string
+        moderators:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pendings:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      example:
+        _id: "5ebac534954b54139806c112"
+        name: "Programming Club"
+        description: "A club for programming enthusiasts"
+        logo: "https://example.com/logo.png"
+        website: "https://www.aust.edu"
+        moderators: []
+        members: []
+        pendings: []
+        createdAt: "2025-08-23T12:00:00.000Z"
+        updatedAt: "2025-08-23T12:00:00.000Z"
+
   responses:
     DuplicateEmail:
       description: Email already taken
