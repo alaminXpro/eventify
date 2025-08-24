@@ -548,18 +548,24 @@ export default function EventCreate() {
                   <MapPin className="mr-1 inline h-4 w-4 text-indigo-300" />
                   Location *
                 </label>
-                <input
+                <select
                   value={form.location}
                   onChange={(e) => setField("location", e.target.value)}
-                  placeholder="e.g., Main Auditorium"
-                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 placeholder:text-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 ${
-                    errors.location ? "border-rose-500" : "border-slate-700/60"
-                  }`}
-                />
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none bg-slate-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40 ${errors.location ? "border-rose-500" : "border-slate-700/60"
+                    }`}
+                >
+                  <option value="">Select a location</option>
+                  <option value="Main Auditorium">Main Auditorium</option>
+                  <option value="Conference Hall A">Conference Hall A</option>
+                  <option value="Conference Hall B">Conference Hall B</option>
+                  <option value="Open Ground">Open Ground</option>
+                  <option value="Seminar Room 1">Seminar Room 1</option>
+                </select>
                 {errors.location && (
                   <p className="mt-1 text-xs text-rose-400">{errors.location}</p>
                 )}
               </div>
+
 
               <div>
                 <label className="mb-1 block text-sm font-semibold">
