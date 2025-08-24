@@ -2,6 +2,8 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Layout from "./Layout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -21,6 +23,7 @@ import MyClubs from "./pages/MyClubs";
 
 function App() {
   return (
+  <>
     <Layout>
       <Routes>
         {/* Public */}
@@ -53,6 +56,8 @@ function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
+      <ToastContainer />
+    </>
   );
 }
 

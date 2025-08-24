@@ -167,10 +167,10 @@ const registerEvent = async (userId, eventId) => {
   }
 
   // Check if EventRecommendation already exists
-  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
+{/*}  const recommendationExists = await EventRecommendation.isRecommendationExists(userId, eventId);
   if (recommendationExists) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Recommendation data already exists for this event');
-  }
+  }*/}
 
   // Get user data with populated clubs and attended events
   const user = await User.findById(userId).populate('clubs', 'name').populate('attendedEvents', 'title');
