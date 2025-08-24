@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion, useScroll, useTransform } from "framer-motion";
 import api from "../utils/axiosInstance";
+ import { generateCertificate } from "../utils/certificate";
+
 
 /* tiny inline icon set */
 const CalendarIcon = (p) => (
@@ -76,6 +78,7 @@ export default function EventDetails() {
   const [error, setError] = useState("");
   const [isRegistering, setIsRegistering] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [isGeneratingCert, setIsGeneratingCert] = useState(false);
 
   // skeleton cross-fade
   const [showingSkeleton, setShowingSkeleton] = useState(true);
@@ -100,6 +103,21 @@ export default function EventDetails() {
       return null;
     }
   })();
+
+   // Participant name for certificate
+ const participantName = (() => {
+   try {
+     const root = localStorage.getItem("persist:root");
+     if (root) {
+       const parsed = JSON.parse(root);
+       const u = JSON.parse(parsed.user || "{}")?.currentUser || {};
+       if (u?.name) return u.name;
+     }
+     const direct = localStorage.getItem("currentUser");
+     if (direct) return (JSON.parse(direct)?.name) || "Participant";
+   } catch {}
+   return "Participant";
+ })();
 
   // increment view (best-effort)
   useEffect(() => {
@@ -173,7 +191,7 @@ export default function EventDetails() {
     try {
       setIsRegistering(true);
       setRegistered(true);
-      setEvent((prev) => prev ? { ...prev, registeredCount: (prev.registeredCount || 0) + 1 } : prev);
+      setEvent((prev) => prev ? { ...prev, registeredCount: (prev.registeredCount || 0) - 1 } : prev);
       await api.post("/events/register", { userId, eventId: event.id });
     } catch (err) {
       setRegistered(false);
@@ -213,7 +231,11 @@ export default function EventDetails() {
     );
   }
 
-  const buttonDisabled = registered || spotsLeft === 0 || isRegistering || isPast;
+  const buttonDisabled = registered || spotsLeft === 0 || isRegistering;
+
+ const eventIsPast = event?.startsAt ? new Date(event.startsAt).getTime() < Date.now() : false;
+
+  const canDownloadCert = eventIsPast && registered;
 
   return (
     <section className={`relative min-h-screen bg-[#0b1220] text-slate-100 ${isPast ? "opacity-90" : ""}`}>
@@ -336,23 +358,47 @@ export default function EventDetails() {
                   </div>
                 </>
               )}
-
               <button
                 onClick={handleRegister}
                 disabled={buttonDisabled}
-                title={isPast ? "This event has ended" : undefined}
                 className={`mb-4 w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${
                   buttonDisabled
                     ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
                     : "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-500"
                 }`}
               >
-                {isPast
-                  ? "Event Ended"
-                  : registered
-                    ? "Registered"
-                    : (spotsLeft === 0 ? "Event Full" : (isRegistering ? "Registering..." : "Register Now"))}
+                {registered ? "Registered" : (spotsLeft === 0 ? "Event Full" : (isRegistering ? "Registering..." : "Register Now"))}
               </button>
+
+            {/* Certificate button: shown if event ended & user registered */}
+            <button
+              onClick={async () => {
+                setIsGeneratingCert(true);
+                try {
+                  await generateCertificate({
+                    participantName,
+                    eventTitle: event.title,
+                    eventDate: [event.date, event.time].filter(Boolean).join(" • "),
+                    location: event.location,
+                    orgName: "EVENTIFY",
+                    logoUrl: "/brand.png",     // put your logo into /public/brand.png
+                    bgUrl: event.image,        // event banner as faint background
+                  });
+                } finally {
+                  setIsGeneratingCert(false);
+                }
+              }}
+              disabled={!canDownloadCert || isGeneratingCert}
+              className={`w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow transition ${
+                !canDownloadCert
+                  ? "cursor-not-allowed bg-slate-700/60 text-slate-500"
+                  : "bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-600"
+              }`}
+              title={!canDownloadCert ? "Available after the event ends and if you were registered." : "Download your certificate"}
+            >
+              {isGeneratingCert ? "Preparing…" : "Download Certificate"}
+            </button>
+
 
               {/* meta */}
               <div className="mt-6 space-y-2 text-sm text-slate-300">
@@ -386,7 +432,7 @@ export default function EventDetails() {
         />
       </div>
 
-      {/* fade + shimmer styles (like Profile) */}
+      {/* fade shimmer styles (like Profile) */}
       <style>{`
         .fade-in { animation: fadeIn 300ms ease-out both; }
         @media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
