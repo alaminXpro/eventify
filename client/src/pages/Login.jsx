@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { toast } from "react-toastify";
+import Cookies from "js-cookie"; // optional; prefer server-set HttpOnly cookies
 import {
   Eye,
   EyeOff,
@@ -9,74 +11,154 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   signInStart,
   signInSuccess,
   signInFailure,
 } from "../redux/user/userSlice.js";
 import axios from "axios";
-// import Cookies from "js-cookie"; // optional; prefer server-set HttpOnly cookies
+import { GoogleLogin } from "@react-oauth/google";
+import { setPageTitle } from "../redux/themeConfigSlice.js";
 
 export default function EventifyLogin() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-
-  const dispatch = useDispatch();
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const { loading, error } = useSelector((state) => state.user);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const API_BASE = import.meta.env.VITE_API_BASE;
 
-  // Use Vite env; in dev I recommend VITE_API_BASE=/v1 with a proxy in vite.config.js
-  const API_BASE = import.meta.env.VITE_API_BASE; // e.g. "/v1" or "http://localhost:3000/v1"
+  useEffect(() => {
+    dispatch(setPageTitle("Login"));
+  }, [dispatch]);
 
-  // ----- Navigation -----
-  const handleBackToHome = () => navigate("/");
+  useEffect(() => {
+    dispatch(signInFailure(null));
+  }, [dispatch]);
 
-  // Make sure this matches your App.jsx route; you used "/register" there
-  const handleGoToSignUp = () => navigate("/register");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  // ----- Auth placeholders -----
-  const handleGoogleLogin = () => {
-    setIsLoading(true);
-    // integrate OAuth here (redirect to your backend OAuth route)
-    setTimeout(() => setIsLoading(false), 2000);
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
+
+  // Function to navigate back to home
+  const handleBackToHome = () => {
+    navigate("/");
+  };
+
+  // Function to navigate to signup page
+  const handleGoToSignUp = () => {
+    navigate("/signup");
+  };
+
+  // Function to handle forgot password
+  const handleForgotPassword = () => {
+    navigate("/forgot-password");
+    // Alternatively, you can show a modal instead
+    // toast.info("Password reset functionality will be implemented soon!");
+  };
+
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      dispatch(signInStart());
+      const res = await axios.post(
+        `${API_BASE}/auth/google`,
+        {
+          credential: credentialResponse.credential,
+        },
+        { withCredentials: true }
+      );
+
+      Cookies.set("accessToken", res.data.tokens.access.token, {
+        expires: new Date(res.data.tokens.access.expires),
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
+      Cookies.set("refreshToken", res.data.tokens.refresh.token, {
+        expires: new Date(res.data.tokens.refresh.expires),
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
+
+      dispatch(signInSuccess(res.data));
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      dispatch(signInFailure(error.response.data.message));
+    }
+  };
+  const handleGoogleError = (error) => {
+    const message =
+      error?.response?.data?.message ||
+      error.message ||
+      "Google sign-in failed";
+    dispatch(signInFailure(message));
+    toast.error(message, {
+      position: "top-right",
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+  };
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.id]: e.target.value,
+    });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    dispatch(signInStart());
 
     try {
-      // send the actual email/password you captured from state
+      dispatch(signInStart());
       const res = await axios.post(
         `${API_BASE}/auth/login`,
-        { email, password },
+        {
+          email: formData.email,
+          password: formData.password,
+        },
         { withCredentials: true }
       );
 
-      // If your backend returns tokens AND you want to store them client-side:
-      // Cookies.set("accessToken", res.data.tokens.access.token, {
-      //   expires: new Date(res.data.tokens.access.expires),
-      //   secure: true,
-      //   sameSite: "none",
-      // });
-      // Cookies.set("refreshToken", res.data.tokens.refresh.token, {
-      //   expires: new Date(res.data.tokens.refresh.expires),
-      //   secure: true,
-      //   sameSite: "none",
-      // });
-      // ⚠️ Do NOT try to set httpOnly from JS; only the server can set that flag.
-
+      Cookies.set("accessToken", res.data.tokens.access.token, {
+        expires: new Date(res.data.tokens.access.expires),
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
+      Cookies.set("refreshToken", res.data.tokens.refresh.token, {
+        expires: new Date(res.data.tokens.refresh.expires),
+        httpOnly: true,
+        secure: true,
+        sameSite: "none",
+      });
       dispatch(signInSuccess(res.data));
-      navigate("/");
+      navigate("/dashboard");
     } catch (error) {
-      // guard against missing response
-      const message = error?.response?.data?.message || error.message || "Login failed";
-      dispatch(signInFailure(message));
-    } finally {
-      setIsLoading(false);
+      console.error("Login error:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "An error occurred during login. Please try again.";
+
+      dispatch(signInFailure(errorMessage));
+
+      // Also display as toast for better visibility
+      toast.error(errorMessage, {
+        position: "top-right",
+        autoClose: 4000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
     }
   };
 
@@ -180,55 +262,42 @@ export default function EventifyLogin() {
           {/* Header */}
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
-            <p className="text-gray-600">
-              Enter your credentials to access your account
-            </p>
           </div>
 
           {/* Google Login */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full flex items-center justify-center space-x-3 py-4 px-6 border-2 border-gray-200 rounded-2xl hover:border-gray-300 hover:bg-gray-50 transition-all duration-300 group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
-            ) : (
-              <>
-                <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden>
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  />
-                </svg>
-                <span className="font-semibold text-gray-700 group-hover:text-gray-900">
-                  Continue with Google
-                </span>
-              </>
-            )}
-          </button>
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={true}
+              scope="profile email"
+            />
+          </div>
 
           {/* Divider */}
-          <div className="flex items-center space-x-4">
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
-            <span className="text-sm text-gray-500 bg-white px-4">or</span>
-            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="flex items-center w-full space-x-4">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+              <span className="text-sm text-gray-500 bg-white px-4">or</span>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+            </div>
+
+            <div className="flex items-center justify-center w-full">
+              <p className="text-gray-600 text-center">
+                Enter your credentials to access your account
+              </p>
+            </div>
           </div>
 
           {/* Email/Password Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error display */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <p className="text-sm font-medium">{error}</p>
+              </div>
+            )}
+
             {/* Email */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-gray-700">
@@ -236,8 +305,9 @@ export default function EventifyLogin() {
               </label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="email"
+                value={formData.email || ""}
+                onChange={handleChange}
                 className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
                 placeholder="Enter your email"
                 required
@@ -251,20 +321,23 @@ export default function EventifyLogin() {
               </label>
               <div className="relative">
                 <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  type={isPasswordVisible ? "text" : "password"}
+                  id="password"
+                  value={formData.password || ""}
+                  onChange={handleChange}
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 pr-12"
                   placeholder="Enter your password"
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((s) => !s)}
+                  onClick={togglePasswordVisibility}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={
+                    isPasswordVisible ? "Hide password" : "Show password"
+                  }
                 >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  {isPasswordVisible ? <EyeOff size={20} /> : <Eye size={20} />}
                 </button>
               </div>
             </div>
@@ -274,12 +347,17 @@ export default function EventifyLogin() {
               <label className="flex items-center">
                 <input
                   type="checkbox"
+                  id="rememberMe"
+                  onChange={(e) =>
+                    setFormData({ ...formData, rememberMe: e.target.checked })
+                  }
                   className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>
               <button
                 type="button"
+                onClick={handleForgotPassword}
                 className="text-sm text-indigo-600 hover:text-indigo-500 font-semibold transition-colors"
               >
                 Forgot password?
@@ -289,10 +367,10 @@ export default function EventifyLogin() {
             {/* Login Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loading}
               className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-indigo-700 hover:to-purple-700 transform hover:scale-[1.02] transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {isLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center space-x-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span>Signing in...</span>
