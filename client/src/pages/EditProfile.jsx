@@ -1,22 +1,83 @@
 // src/pages/EditProfile.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { useSelector, useDispatch } from "react-redux";
+import React, { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import api from "../utils/axiosInstance";
 import { ArrowLeft, Save, User as UserIcon } from "lucide-react";
 
-// Optional: if you have an action to replace the user in Redux,
-// import it here. Otherwise we'll just navigate after saving.
-// import { setUser } from "../redux/user/userSlice";
+/* Enums for chip/dropdown controls (keep here, or fetch from backend / share via a constants file) */
+const SKILLS_ENUM = [
+  "Programming","Web Development","App Development","Machine Learning","Artificial Intelligence","Data Science","Cybersecurity","Cloud Computing","IoT","Robotics","Blockchain","Game Development","UI/UX Design","Database Management","Version Control",
+  "Public Speaking","Leadership","Team Management","Networking","Critical Thinking","Time Management","Project Management","Resume Writing","Interview Preparation","Career Planning",
+  "Graphic Design","Video Editing","Photography","Creative Writing","Content Creation","Event Management","Drama","Music","Dance","Debate","Anchoring",
+  "Entrepreneurship","Startup Pitching","Marketing","Social Media Marketing","Finance Basics","Business Strategy","Negotiation",
+  "Football","Cricket","Basketball","Fitness Training","Yoga","Meditation","Stress Management","Nutrition",
+  "Volunteering","Fundraising","Social Impact","Environmental Awareness","Diversity & Inclusion","Community Building",
+];
+
+const CATEGORY_ENUM   = ["Tech","Business","Design","Marketing","Finance","Law","Health","Education","Other"];
+const FORMAT_ENUM     = ["Online","Offline","Hybrid","Workshop","Seminar","Conference","Hackathon","Meetup","Other"];
+const GROUP_ENUM      = ["Small (1-10)","Medium (11-50)","Large (51-100)","Very Large (100+)"];
+const POPULARITY_ENUM = ["Low","Medium","High","Very High"];
 
 const DEPARTMENTS = ["", "CSE", "EEE", "CE", "ME", "BBA", "TE", "IPE"];
-const SEMESTERS = ["", "1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2"];
+const SEMESTERS   = ["", "1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "4.2"];
+
+/* Chip UI helpers */
+function Chip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-xs font-semibold border transition-colors
+      ${active ? "bg-indigo-600 text-white border-indigo-600"
+               : "bg-slate-900/60 text-slate-200 border-slate-700/60 hover:bg-slate-800/60"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ChipMulti({ label, items, value, onChange }) {
+  const toggle = (v) => {
+    const set = new Set(value || []);
+    set.has(v) ? set.delete(v) : set.add(v);
+    onChange(Array.from(set));
+  };
+  return (
+    <div>
+      <div className="mb-1 block text-sm font-semibold text-slate-300">{label}</div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((it) => (
+          <Chip key={it} active={(value || []).includes(it)} onClick={() => toggle(it)}>
+            {it}
+          </Chip>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Fetch fresh user (by id first, then by studentId) */
+async function fetchFreshUser({ userFromStore, fallbackUser }) {
+  const id = userFromStore?._id || userFromStore?.id;
+  const studentId = userFromStore?.studentId || fallbackUser?.studentId;
+
+  if (id) {
+    try {
+      const { data } = await api.get(`/users/${id}`);
+      return data;
+    } catch (_) {}
+  }
+  if (studentId) {
+    const { data } = await api.get(`/users/profile/${encodeURIComponent(studentId)}`);
+    return data;
+  }
+  return null;
+}
 
 export default function EditProfile() {
   const navigate = useNavigate();
-  const dispatch = useDispatch();
-
-  // Try common shapes used in your project
   const userFromStore = useSelector(
     (s) => s?.user?.user || s?.user?.currentUser || s?.auth?.user || null
   );
@@ -26,17 +87,15 @@ export default function EditProfile() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
 
-  // Form state (exact keys match your Joi & Mongoose schema)
   const [form, setForm] = useState({
     email: "",
     name: "",
-    avatar: "",
     department: "",
     semester: "",
     studentId: "",
     bio: "",
     profession: "",
-    skills: "", // comma-separated (server can split)
+    skills: [],
     phone: "",
     address: "",
     website: "",
@@ -45,61 +104,60 @@ export default function EditProfile() {
     twitter: "",
     facebook: "",
     github: "",
+    preferences: {
+      preferredEventCategory: [],
+      preferredEventFormat: [],
+      eventGroupSize: [],
+      eventPopularity: [],
+    },
   });
 
-  // Fetch on hard refresh if Redux is empty
   useEffect(() => {
-    if (userFromStore) {
-      hydrateFromUser(userFromStore);
-      setLoading(false);
-      return;
-    }
     let active = true;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        const me =
-          (await api.get("/auth/me").catch(() => null)) ||
-          (await api.get("/users/me").catch(() => null));
-        if (!active) return;
-        if (me?.data) {
-          hydrateFromUser(me.data);
+
+        if (userFromStore) {
+          hydrateFromUser(userFromStore);
         } else {
+          const me =
+            (await api.get("/auth/me").catch(() => null)) ||
+            (await api.get("/users/me").catch(() => null));
+          if (me?.data) hydrateFromUser(me.data);
+        }
+
+        const fresh = await fetchFreshUser({ userFromStore, fallbackUser: form });
+        if (active && fresh) {
+          hydrateFromUser(fresh);
+        } else if (active && !fresh && !userFromStore) {
           setErr("Could not load your profile.");
         }
       } catch (e) {
-        if (!active) return;
-        setErr(e?.response?.data?.message || "Could not load your profile.");
+        if (active) setErr(e?.response?.data?.message || "Could not load your profile.");
       } finally {
         if (active) setLoading(false);
       }
     })();
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userFromStore]);
 
-  const userId = useMemo(() => {
-    const u = userFromStore;
-    return u?._id || u?.id;
-  }, [userFromStore]);
+  const userId = userFromStore?._id || userFromStore?.id;
 
   function hydrateFromUser(u) {
     setForm({
       email: u?.email || "",
-      name: u?.name || "",
-      avatar:
-        u?.avatar ||
-        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png",
+      name:  u?.name  || "",
       department: u?.department ?? "",
-      semester: u?.semester ?? "",
-      studentId: u?.studentId ?? "",
+      semester:   u?.semester   ?? "",
+      studentId:  u?.studentId  ?? "",
       bio: u?.bio ?? "",
       profession: u?.profession ?? "",
-      // If it's already an array, join to comma string; if string, use as-is
-      skills: Array.isArray(u?.skills) ? u.skills.join(", ") : (u?.skills || ""),
+      skills: Array.isArray(u?.skills)
+        ? u.skills
+        : (u?.skills ? String(u?.skills).split(",").map((s) => s.trim()).filter(Boolean) : []),
       phone: u?.phone ?? "",
       address: u?.address ?? "",
       website: u?.website ?? "",
@@ -108,15 +166,23 @@ export default function EditProfile() {
       twitter: u?.twitter ?? "",
       facebook: u?.facebook ?? "",
       github: u?.github ?? "",
+      preferences: {
+        preferredEventCategory: Array.isArray(u?.preferences?.preferredEventCategory) ? u.preferences.preferredEventCategory : [],
+        preferredEventFormat:   Array.isArray(u?.preferences?.preferredEventFormat)   ? u.preferences.preferredEventFormat   : [],
+        eventGroupSize:         Array.isArray(u?.preferences?.eventGroupSize)         ? u.preferences.eventGroupSize         : [],
+        eventPopularity:        Array.isArray(u?.preferences?.eventPopularity)        ? u.preferences.eventPopularity        : [],
+      },
     });
   }
 
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setPref  = (k, v) => setForm((f) => ({ ...f, preferences: { ...f.preferences, [k]: v }}));
 
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
     setOk("");
+
     if (!userId) {
       setErr("Missing user id.");
       return;
@@ -124,36 +190,31 @@ export default function EditProfile() {
 
     setSaving(true);
     try {
-      // Only include fields we actually send (Joi .min(1) ok)
-      // Note: sending empty strings is allowed by your Joi to "clear" fields.
-      const payload = { ...form };
-
-      // The backend accepts either array or string for `skills`.
-      // We'll send the comma string; backend will split.
-      // If you prefer array, you could do:
-      // payload.skills = form.skills
-      //  ? form.skills.split(",").map(s => s.trim()).filter(Boolean)
-      //  : [];
+      const payload = {
+        ...form,
+        skills: Array.isArray(form.skills)
+          ? form.skills
+          : String(form.skills || "").split(",").map((s) => s.trim()).filter(Boolean),
+        preferences: { ...form.preferences },
+      };
 
       const { data: updated } = await api.patch(`/users/${userId}`, payload);
 
-      // If you keep the user in Redux, refresh it here:
-      // dispatch(setUser(updated));
+      try { localStorage.setItem("currentUser", JSON.stringify(updated)); } catch {}
+
+      try {
+        const fresh = await fetchFreshUser({ userFromStore: updated, fallbackUser: updated });
+        if (fresh) hydrateFromUser(fresh);
+      } catch {}
 
       setOk("Profile updated.");
-      // Go back to /profile after a moment (optional)
-      setTimeout(() => navigate("/profile"), 600);
+      setTimeout(() => navigate("/profile"), 400);
     } catch (e) {
       setErr(e?.response?.data?.message || "Failed to update profile.");
     } finally {
       setSaving(false);
     }
   };
-
-  // Live avatar preview
-  const avatarSrc =
-    form.avatar?.trim() ||
-    "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png";
 
   return (
     <section className="min-h-screen bg-[#0b1220] text-slate-100 py-10">
@@ -171,22 +232,14 @@ export default function EditProfile() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/60">
-          {/* Header */}
+          {/* Header (no avatar) */}
           <div className="flex items-start gap-4 p-6">
-            <img
-              src={avatarSrc}
-              alt="avatar"
-              className="h-20 w-20 rounded-xl object-cover ring-2 ring-[#0b1220]"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src =
-                  "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png";
-              }}
-            />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-800/60 ring-2 ring-[#0b1220]">
+              <UserIcon className="h-6 w-6 text-indigo-300" />
+            </div>
             <div>
               <div className="text-sm text-slate-400">Preview</div>
               <div className="mt-1 flex items-center gap-2 text-lg font-semibold">
-                <UserIcon className="h-4 w-4 text-indigo-300" />
                 {form.name || "Your Name"}
               </div>
               <div className="text-slate-400">{form.email || "you@example.com"}</div>
@@ -209,126 +262,65 @@ export default function EditProfile() {
           <form onSubmit={submit} className="p-6 space-y-6">
             {/* Basic */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                label="Name"
-                value={form.name}
-                onChange={(v) => setField("name", v)}
-                placeholder="Full name"
-              />
-              <Field
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={(v) => setField("email", v)}
-                placeholder="you@university.edu"
-              />
+              <Field label="Name" value={form.name} onChange={(v) => setField("name", v)} placeholder="Full name" />
+              <Field label="Email" type="email" value={form.email} onChange={(v) => setField("email", v)} placeholder="you@university.edu" />
             </div>
-
-            <Field
-              label="Avatar (URL)"
-              value={form.avatar}
-              onChange={(v) => setField("avatar", v)}
-              placeholder="https://…"
-            />
 
             {/* Academic */}
             <div className="grid gap-4 md:grid-cols-3">
-              <SelectField
-                label="Department"
-                value={form.department}
-                onChange={(v) => setField("department", v)}
-                options={DEPARTMENTS}
-              />
-              <SelectField
-                label="Semester"
-                value={form.semester}
-                onChange={(v) => setField("semester", v)}
-                options={SEMESTERS}
-              />
-              <Field
-                label="Student ID"
-                value={form.studentId}
-                onChange={(v) => setField("studentId", v)}
-                placeholder="e.g., 2023xxxx"
-              />
+              <SelectField label="Department" value={form.department} onChange={(v) => setField("department", v)} options={DEPARTMENTS} />
+              <SelectField label="Semester" value={form.semester} onChange={(v) => setField("semester", v)} options={SEMESTERS} />
+              <Field label="Student ID" value={form.studentId} onChange={(v) => setField("studentId", v)} placeholder="e.g., 2023xxxx" />
             </div>
 
             {/* About */}
-            <Field
-              label="Profession"
-              value={form.profession}
-              onChange={(v) => setField("profession", v)}
-              placeholder="Student Developer"
-            />
-            <TextArea
-              label="Bio"
-              value={form.bio}
-              onChange={(v) => setField("bio", v)}
-              placeholder="Tell us about yourself (max 500 chars)"
-              maxLength={500}
-            />
+            <Field label="Profession" value={form.profession} onChange={(v) => setField("profession", v)} placeholder="Student Developer" />
+            <TextArea label="Bio" value={form.bio} onChange={(v) => setField("bio", v)} placeholder="Tell us about yourself (max 500 chars)" maxLength={500} />
 
-            {/* Skills */}
-            <Field
-              label="Skills (comma separated)"
-              value={form.skills}
-              onChange={(v) => setField("skills", v)}
-              placeholder="JavaScript, Python, React"
-            />
+            {/* Skills (chips) */}
+            <ChipMulti label="Skills" items={SKILLS_ENUM} value={form.skills} onChange={(v) => setField("skills", v)} />
 
             {/* Contact */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                label="Phone"
-                value={form.phone}
-                onChange={(v) => setField("phone", v)}
-                placeholder="+8801XXXXXXXXX"
-              />
-              <Field
-                label="Address"
-                value={form.address}
-                onChange={(v) => setField("address", v)}
-                placeholder="City, Country"
-              />
+              <Field label="Phone" value={form.phone} onChange={(v) => setField("phone", v)} placeholder="+8801XXXXXXXXX" />
+              <Field label="Address" value={form.address} onChange={(v) => setField("address", v)} placeholder="City, Country" />
             </div>
 
             {/* Links */}
             <div className="grid gap-4 md:grid-cols-2">
-              <Field
-                label="Website"
-                value={form.website}
-                onChange={(v) => setField("website", v)}
-                placeholder="https://your-site.com"
+              <Field label="Website" value={form.website} onChange={(v) => setField("website", v)} placeholder="https://your-site.com" />
+              <Field label="CV (URL)" value={form.cv} onChange={(v) => setField("cv", v)} placeholder="https://drive.google.com/…" />
+              <Field label="LinkedIn" value={form.linkedin} onChange={(v) => setField("linkedin", v)} placeholder="https://linkedin.com/in/…" />
+              <Field label="Twitter / X" value={form.twitter} onChange={(v) => setField("twitter", v)} placeholder="https://twitter.com/…" />
+              <Field label="Facebook" value={form.facebook} onChange={(v) => setField("facebook", v)} placeholder="https://facebook.com/…" />
+              <Field label="GitHub" value={form.github} onChange={(v) => setField("github", v)} placeholder="https://github.com/…" />
+            </div>
+
+            {/* Preferences (chips) */}
+            <div className="space-y-4">
+              <ChipMulti
+                label="Preferred Categories"
+                items={CATEGORY_ENUM}
+                value={form.preferences.preferredEventCategory}
+                onChange={(v) => setPref("preferredEventCategory", v)}
               />
-              <Field
-                label="CV (URL)"
-                value={form.cv}
-                onChange={(v) => setField("cv", v)}
-                placeholder="https://drive.google.com/…"
+              <ChipMulti
+                label="Preferred Formats"
+                items={FORMAT_ENUM}
+                value={form.preferences.preferredEventFormat}
+                onChange={(v) => setPref("preferredEventFormat", v)}
               />
-              <Field
-                label="LinkedIn"
-                value={form.linkedin}
-                onChange={(v) => setField("linkedin", v)}
-                placeholder="https://linkedin.com/in/…"
+              <ChipMulti
+                label="Group Size"
+                items={GROUP_ENUM}
+                value={form.preferences.eventGroupSize}
+                onChange={(v) => setPref("eventGroupSize", v)}
               />
-              <Field
-                label="Twitter / X"
-                value={form.twitter}
-                onChange={(v) => setField("twitter", v)}
-                placeholder="https://twitter.com/…"
-              />
-              <Field
-                label="Facebook"
-                value={form.facebook}
-                onChange={(v) => setField("facebook", v)}
-                placeholder="https://facebook.com/…"
-              />
-              <Field
-                label="GitHub"
-                value={form.github}
-                onChange={(v) => setField("github", v)}
-                placeholder="https://github.com/…"
+              <ChipMulti
+                label="Popularity"
+                items={POPULARITY_ENUM}
+                value={form.preferences.eventPopularity}
+                onChange={(v) => setPref("eventPopularity", v)}
               />
             </div>
 
@@ -356,8 +348,7 @@ export default function EditProfile() {
   );
 }
 
-/* ---------------- Small inputs ---------------- */
-
+/* Small inputs */
 function Field({ label, value, onChange, placeholder, type = "text" }) {
   return (
     <label className="block">
