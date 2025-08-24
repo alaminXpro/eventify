@@ -77,7 +77,7 @@ const Sidebar = () => {
           <div className="flex justify-between items-center px-4 py-3">
             <NavLink to="/" className="main-logo flex items-center shrink-0">
               <img className="w-8 ml-[5px] flex-none" src="/favicon.ico" alt="logo" />
-              <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">{t('AUSTCMS')}</span>
+              <span className="text-2xl ltr:ml-1.5 rtl:mr-1.5 font-semibold align-middle lg:inline dark:text-white-light">{t('Eventify')}</span>
             </NavLink>
 
             <button
@@ -105,11 +105,11 @@ const Sidebar = () => {
                 <AnimateHeight duration={300} height={currentMenu === 'dashboard' ? 'auto' : 0}>
                   <ul className="sub-menu text-gray-500">
                     <li>
-                      <NavLink to="/">{t('AUSTCMS Admin')}</NavLink>
+                      <NavLink to="/">{t('Eventify Admin')}</NavLink>
                     </li>
                     <li>
                       <NavLink to="https://aust-cms.vercel.app" target="_blank">
-                        {t('AUSTCMS Member')}
+                        {t('Eventify Member')}
                       </NavLink>
                     </li>
                     <li>
