@@ -1,4 +1,4 @@
-# HACKATHON PROJECT: Eventify – Club Event Management Platform for Universities
+# 🎉 Eventify – University Club Event Management Platform  
 
 <div align="center">  
 <h1>Eventify</h1>  
@@ -6,182 +6,191 @@
 
 ---
 
-### Table of Contents  
-[Overview](#overview) – [Key Features](#key-features) – [Goals](#goals) – [Intended Users](#intended-users) – [API Routes](#api-routes) – [Project Roadmap](#project-roadmap) – [Tech Stack](#tech-stack) – [Setup Guide](#setup-guide) – [Contributors](#contributors)  
+## 📑 Contents  
+- [Introduction](#introduction)  
+- [Core Features](#core-features)  
+- [Objectives](#objectives)  
+- [Audience](#audience)  
+- [API Specification](#api-specification)  
+- [Development Roadmap](#development-roadmap)  
+- [Technology Stack](#technology-stack)  
+- [Installation & Setup](#installation--setup)  
+- [Contributors](#contributors)  
 
 ---
 
-## 📝 Overview <a id="overview"></a>  
+## 📌 Introduction <a id="introduction"></a>  
 
-Eventify is a collaborative web application built to simplify university club event management. It enables organizers to create and manage events while allowing students to discover, register for, and track participation. The system is developed with the MERN stack (MongoDB, Express.js, React, Node.js) and is planned to be hosted on Vercel.  
-
----
-
-## 💡 Key Features <a id="key-features"></a>  
-
-**1. Secure Login & User Roles**  
-- Account creation and sign-in.  
-- Role-specific access for students and club organizers.  
-
-**2. Event Handling**  
-- Organizers can add, update, and remove events.  
-- Students can browse event information and manage their registrations.  
-
-**3. Student Tools**  
-- Browse upcoming events easily.  
-- Sign up or cancel registration for events.  
-- Personal dashboard with list of registered events.  
-
-**4. Organizer Tools**  
-- Add new events.  
-- Edit or remove events.  
-- Check attendance lists.  
-- Use an admin dashboard for full event oversight.  
-
-**5. Event Discovery**  
-- Search events by name, category, or schedule.  
-- Filter based on date, location, or upcoming status.  
-
-**6. Auto-Certificate Issuing**  
-- Participants can download certificates generated automatically after events.  
+**Eventify** is a modern web application designed to simplify university club event organization. Built with the **MERN stack** (MongoDB, Express.js, React, Node.js) and optimized for deployment on **Vercel**, it empowers club organizers to host, manage, and track events while giving students an intuitive way to register, participate, and stay engaged.  
 
 ---
 
-## 🎯 Goals <a id="goals"></a>  
+## 🚀 Core Features <a id="core-features"></a>  
 
-- **Efficient Event Handling**: Offer organizers a streamlined way to manage events.  
-- **Boost Student Participation**: Make signing up for events simple and engaging.  
-- **User-Friendly Access**: Deliver a clean and easy-to-use interface.  
-- **Encourage Campus Community**: Create stronger connections between students and clubs.  
+1. **Authentication & Role Management**  
+   - Secure registration and login.  
+   - Role-specific permissions for students and organizers.  
 
----
+2. **Event Lifecycle Management**  
+   - Create, update, and remove events (organizers).  
+   - Access event details and participation status (students).  
 
-## 👥 Intended Users <a id="intended-users"></a>  
+3. **Student Portal**  
+   - Browse all upcoming events.  
+   - Register or cancel participation seamlessly.  
+   - Dashboard view of enrolled events.  
 
-- Students interested in joining and tracking university events.  
-- Club leaders organizing and managing activities.  
-- Faculty or staff supporting student engagement programs.  
+4. **Organizer Dashboard**  
+   - Centralized panel for managing events.  
+   - View participant lists and event insights.  
 
----
+5. **Event Discovery Tools**  
+   - Keyword search (by title, category, or date).  
+   - Filters for upcoming, location-based, or category-specific events.  
 
-## 📜 API Routes <a id="api-routes"></a>  
+6. **Automated Certificates**  
+   - Post-event certificate generation and downloads for attendees.  
 
-### Authentication  
-- **POST /register** → Register a new user.  
-- **POST /login** → Log in an existing user.  
-
-### Events  
-- **GET /events** → Retrieve all events.  
-- **GET /events/{id}** → Retrieve details of one event.  
-- **POST /events** → Add new event (restricted to organizers).  
-- **PUT /events/{id}** → Edit event details (organizers only).  
-- **DELETE /events/{id}** → Remove event (organizers only).  
-
-### Registrations  
-- **GET /registrations/{eventId}** → Get attendees for an event.  
-- **POST /registrations** → Sign up for an event.  
-- **DELETE /registrations/{id}** → Cancel event registration.  
-
-### Certificates  
-- **GET /certificates/{eventId}** → Download participation certificate.  
-
-### Miscellaneous  
-- **GET /search** → Search or filter event listings.  
-- **GET /dashboard** → Get dashboard data for student or organizer.  
+7. **User Sections**  
+   - **Profile** → Manage personal details and view activity.  
+   - **Dashboard** → Central hub for quick insights (student or organizer).  
+   - **Events** → Explore, register, and manage events.  
+   - **Clubs** → Browse and follow university clubs.  
 
 ---
 
-## 📝 Project Roadmap <a id="project-roadmap"></a>  
+## 🎯 Objectives <a id="objectives"></a>  
 
-**Milestone 1: Core Setup & Basics**  
-- ✅ Configure backend and frontend (MERN).  
-- ✅ Add authentication (signup and login).  
-- ✅ Implement APIs for events and registrations.  
-- ✅ Basic UI: login, register, homepage.  
-
-**Milestone 2: Interactive Features**  
-- ✅ Add register/unregister functionality.  
-- ✅ Implement event search and filters.  
-- ✅ Build dashboards for students & organizers.  
-- ✅ Integrate certificate generator.  
-
-**Milestone 3: Final Polish & Deployment**  
-- ⬜ Conduct testing and fix issues.  
-- ⬜ Improve mobile responsiveness.  
-- ⬜ Deploy the final build on Vercel.  
+- **Simplify Event Management** → Provide organizers with a frictionless tool to manage events.  
+- **Increase Student Engagement** → Encourage higher participation with smooth signup workflows.  
+- **Accessibility & Usability** → Deliver a responsive and user-first interface.  
+- **Community Building** → Foster connections between students, clubs, and staff.  
 
 ---
 
-## 💻 Tech Stack <a id="tech-stack"></a>  
+## 👥 Audience <a id="audience"></a>  
 
-- **Backend**: ![Node.js](https://img.shields.io/badge/-Node.js-339933?style=flat-square&logo=node.js&logoColor=white)  
-- **Frontend**: ![React](https://img.shields.io/badge/-React-61DAFB?style=flat-square&logo=react&logoColor=white)  
-- **Database**: ![MongoDB](https://img.shields.io/badge/-MongoDB-47A248?style=flat-square&logo=mongodb&logoColor=white)  
-- **Framework**: ![Express.js](https://img.shields.io/badge/-Express.js-000000?style=flat-square&logo=express&logoColor=white)  
-- **Version Control**: ![Git](https://img.shields.io/badge/-Git-F05032?style=flat-square&logo=git&logoColor=white)  
-- **Repository**: ![GitHub](https://img.shields.io/badge/-GitHub-181717?style=flat-square&logo=github&logoColor=white)  
-- **Hosting**: ![Vercel](https://img.shields.io/badge/-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)  
+- **Students** → Interested in exploring and joining events.  
+- **Club Leaders** → Responsible for organizing and managing activities.  
+- **University Staff** → Supporting student affairs and engagement programs.  
 
 ---
 
-## 🚀 Setup Guide <a id="setup-guide"></a>  
+## 📜 API Specification <a id="api-specification"></a>  
 
-### Requirements  
+### 🔑 Authentication  
+- `POST /register` → Create a new user account.  
+- `POST /login` → Authenticate existing users.  
+
+### 📅 Events  
+- `GET /events` → Fetch all events.  
+- `GET /events/{id}` → Fetch a specific event.  
+- `POST /events` → Create an event (organizer only).  
+- `PUT /events/{id}` → Update an event (organizer only).  
+- `DELETE /events/{id}` → Delete an event (organizer only).  
+
+### 📝 Registrations  
+- `GET /registrations/{eventId}` → Get attendee list for an event.  
+- `POST /registrations` → Register for an event.  
+- `DELETE /registrations/{id}` → Cancel registration.  
+
+### 🎓 Certificates  
+- `GET /certificates/{eventId}` → Generate/download a certificate.  
+
+### 🔍 Miscellaneous  
+- `GET /search` → Search & filter events.  
+- `GET /dashboard` → Personalized dashboard for student/organizer.  
+- `GET /profile` → Fetch and update user profile.  
+- `GET /clubs` → Browse university clubs.  
+
+---
+
+## 🛠 Development Roadmap <a id="development-roadmap"></a>  
+
+**Phase 1: Foundation**  
+- ✅ Backend + frontend setup (MERN).  
+- ✅ Authentication (signup/login).  
+- ✅ Core APIs for events and registrations.  
+- ✅ Basic UI for auth and home.  
+
+**Phase 2: Core Features**  
+- ✅ Event registration/unregistration.  
+- ✅ Search and filter implementation.  
+- ✅ Student & organizer dashboards.  
+- ✅ Auto-certificate generation.  
+- ✅ Profile and Clubs sections.  
+
+**Phase 3: Launch Prep**  
+- ⬜ Full QA testing and bug resolution.  
+- ⬜ Mobile optimization.  
+- ⬜ Deployment on Vercel.  
+
+---
+
+## 💻 Technology Stack <a id="technology-stack"></a>  
+
+- **Backend** → Node.js + Express.js  
+- **Frontend** → React.js (Vite)  
+- **Database** → MongoDB (Atlas or local)  
+- **Version Control** → Git + GitHub  
+- **Deployment** → Vercel  
+- **Package Manager** → pnpm  
+
+---
+
+## ⚙️ Installation & Setup <a id="installation--setup"></a>  
+
+### Prerequisites  
 - Node.js ≥ 14.x  
-- npm or yarn  
-- MongoDB (local or Atlas)  
-- Optional: Vercel CLI  
+- pnpm installed globally  
+- MongoDB (Atlas or local)  
+- Vercel CLI (optional for deployment)  
 
-**Backend Setup (Node.js + Express)**  
-1. Clone the repository:  
+### Backend Setup (Express + Node.js)  
 ```bash
-git clone https://github.com/yourusername/Eventify.git
-```  
-2. Enter backend folder:  
-```bash
-cd Eventify/backend
-```  
-3. Install dependencies:  
-```bash
-npm install
-```  
-4. Add environment variables in `.env`:  
-```plaintext
+# Clone the repository
+git clone https://github.com/yourusername/Eventify.git  
+
+# Navigate into backend
+cd Eventify/backend  
+
+# Install dependencies
+pnpm install  
+
+# Create a .env file with the following:
 PORT=5000
 MONGODB_URI=your_mongodb_uri
-JWT_SECRET=your_jwt_secret
-```  
-5. Run server:  
-```bash
-npm start
+JWT_SECRET=your_jwt_secret  
+
+# Start the backend
+pnpm start  
 ```  
 
-**Frontend Setup (React)**  
-1. Go to frontend folder:  
+### Frontend Setup (React + Vite)  
 ```bash
-cd Eventify/frontend
-```  
-2. Install packages:  
-```bash
-npm install
-```  
-3. Start frontend server:  
-```bash
-npm run dev
-```  
-4. Update `.env` with API URL:  
-```plaintext
-VITE_API_URL=http://localhost:5000
+# Navigate into frontend
+cd Eventify/frontend  
+
+# Install dependencies
+pnpm install  
+
+# Run the development server
+pnpm run dev  
+
+# Update .env file with backend API URL
+VITE_API_URL=http://localhost:5000  
 ```  
 
 ---
 
-## 👥 Contributors <a id="contributors"></a>  
+## 🤝 Contributors <a id="contributors"></a>  
 
-| **Name** | **Email** | **GitHub** |  
-|---|---|---|  
+| Name | Email | GitHub |  
+|------|-------|--------|  
 | **Julker Nayeen Karim** | julkernkarim@gmail.com | [jnkarim](https://github.com/jnkarim) |  
 | **Abdullah Al Tamim** | abdullahaltamim001@gmail.com | [abtaamim](https://github.com/abtaamim) |  
 | **Md Al Amin** | alamin.cse.20220104154@aust.edu | [alaminXpro](https://github.com/alaminXpro) |  
 
 ---
+
+✨ *Eventify is built to empower students and clubs with effortless event management. Thank you for checking out our project!*  
