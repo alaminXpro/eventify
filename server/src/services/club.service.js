@@ -325,6 +325,15 @@ const deleteClubMember = async (clubId, memberIds) => {
   return club;
 };
 
+/**
+ * Get all clubs where user is a moderator
+ * @param {ObjectId} moderatorId
+ * @returns {Promise<Club[]>}
+ */
+const getClubsByModerator = async (moderatorId) => {
+  return Club.find({ moderators: moderatorId });
+};
+
 module.exports = {
   createClub,
   queryClubs,
@@ -341,4 +350,5 @@ module.exports = {
   addUserToPendingList,
   deleteClubMember,
   removeUserFromPendingList,
+  getClubsByModerator,
 };

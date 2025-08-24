@@ -1,7 +1,7 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
 const validate = require('../../middlewares/validate');
-const { checkEventClubOwnership } = require('../../middlewares/eventAuth');
+const { checkEventClubOwnership, checkEventViewAccess } = require('../../middlewares/eventAuth');
 const eventValidation = require('../../validations/event.validation');
 const eventController = require('../../controllers/event.controller');
 
@@ -10,7 +10,7 @@ const router = express.Router();
 router
   .route('/')
   .post(auth('manageEvents'), validate(eventValidation.createEvent), checkEventClubOwnership, eventController.createEvent)
-  .get(validate(eventValidation.getEvents), eventController.getEvents);
+  .get(auth('manageEvents'), validate(eventValidation.getEvents), checkEventViewAccess, eventController.getEvents);
 
 router
   .route('/published')
@@ -452,8 +452,10 @@ module.exports = router;
  *
  *   get:
  *     summary: Get all events
- *     description: Retrieve all events with optional filtering.
+ *     description: Restricted access. Only admin can view all events. Club moderators can only see events from clubs they moderate.
  *     tags: [Events]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: title
@@ -526,6 +528,10 @@ module.exports = router;
  *                 totalResults:
  *                   type: integer
  *                   example: 1
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ *       "403":
+ *         $ref: '#/components/responses/Forbidden'
  */
 
 /**

@@ -51,8 +51,43 @@ const checkEventClubOwnership = catchAsync(async (req, res, next) => {
   next();
 });
 
+/**
+ * Middleware to check if user is authorized to view all events
+ * Admin can always access, moderators can only access events from clubs they moderate
+ */
+const checkEventViewAccess = catchAsync(async (req, res, next) => {
+  const user = req.user;
+
+  // Admin can view all events
+  if (user.role === 'admin') {
+    return next();
+  }
+
+  // For moderators, filter events by their clubs
+  if (user.role === 'moderator') {
+    // Get all clubs the moderator manages
+    const clubs = await clubService.getClubsByModerator(user.id);
+    
+    if (!clubs || clubs.length === 0) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have permission to access events');
+    }
+    
+    // Create an array of club IDs the moderator manages
+    const clubIds = clubs.map(club => club.id);
+    
+    // Add filter to only show events from clubs the moderator manages
+    req.query.club_hosting = { $in: clubIds };
+  } else {
+    // Regular users should not access this endpoint
+    throw new ApiError(httpStatus.FORBIDDEN, 'Not authorized to view all events');
+  }
+
+  next();
+});
+
 module.exports = {
   checkEventClubOwnership,
+  checkEventViewAccess,
 };
 /**
  * Middleware to check if moderator owns the club being modified
