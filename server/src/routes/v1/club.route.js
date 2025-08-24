@@ -257,6 +257,48 @@ router
   .post(auth('getClubs'), validate(clubValidation.memberStatus), clubController.memberStatus);
 
 
+
+// join club
+
+/**
+ * @swagger
+ * /clubs/join:
+ *   post:
+ *     summary: Request to join a club
+ *     description: Authenticated users can request to join a club. The clubId must be provided in the request body.
+ *     tags: [Clubs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - clubId
+ *             properties:
+ *               clubId:
+ *                 type: string
+ *                 example: "5ebac534954b54139806c112"
+ *     responses:
+ *       "200":
+ *         description: Successfully requested to join the club
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Request to join club 'Programming Club' was successful."
+ */
+router
+  .route('/join')
+  .post(auth(), validate(clubValidation.joinClub), clubController.joinClub);
+
+
+
 /**
  * @swagger
  * /clubs/{clubId}/moderators:

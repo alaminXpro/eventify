@@ -26,6 +26,11 @@ const getClub = {
   }),
 };
 
+const joinClub = {
+  body: Joi.object().keys({
+    clubId: Joi.string().custom(objectId).required(),
+  }),
+};
 const getPendingMembers = {
   params: Joi.object().keys({
     clubId: Joi.string().custom(objectId).required(),
@@ -125,6 +130,7 @@ module.exports = {
   deleteClub,
   addModeratorToClub,
   removeModeratorFromClub,
+  joinClub,
   approveClubMember,
   getPendingMembers,
   getClubMembers,
