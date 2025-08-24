@@ -21,12 +21,11 @@ import {
   Facebook,
   ListChecks,
   Pencil,
+  RefreshCw,
 } from "lucide-react";
 
 export default function Profile() {
   const navigate = useNavigate();
-
-  // Try common shapes: adjust if your slice differs
   const userFromStore = useSelector(
     (s) => s?.user?.user || s?.user?.currentUser || s?.auth?.user || null
   );
@@ -35,24 +34,75 @@ export default function Profile() {
   const [loading, setLoading] = useState(!userFromStore);
   const [err, setErr] = useState("");
 
+  const fetchUserData = async () => {
+    try {
+      setLoading(true);
+      setErr("");
+
+      // Try to get current user ID from store first
+      const userId = userFromStore?._id || userFromStore?.id;
+      const studentId = userFromStore?.studentId;
+
+      let userData = null;
+
+      // Try different endpoints based on available information
+      if (userId) {
+        try {
+          // Use the protected endpoint if we have a user ID
+          const response = await api.get(`/users/${userId}`);
+          userData = response.data;
+        } catch (error) {
+          console.error("Failed to fetch user by ID:", error);
+        }
+      }
+
+      // If still no data and we have a student ID, try the public endpoint
+      if (!userData && studentId) {
+        try {
+          const response = await api.get(`/profile/${studentId}`);
+          userData = response.data;
+        } catch (error) {
+          console.error("Failed to fetch user by student ID:", error);
+        }
+      }
+
+      // If we have user data from any endpoint, set it
+      if (userData) {
+        setUser(userData);
+      } else {
+        setErr("Could not load profile. Please try again.");
+      }
+    } catch (e) {
+      setErr(e?.response?.data?.message || "Could not load profile");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fallback fetch on hard refresh
   useEffect(() => {
     if (userFromStore) {
       setUser(userFromStore);
-      setLoading(false);
+
+      // Still try to fetch fresh data if we have a user ID
+      if (userFromStore._id || userFromStore.id || userFromStore.studentId) {
+        fetchUserData();
+      } else {
+        setLoading(false);
+      }
       return;
     }
+
+    // If no user in store, try to get basic auth info
     let active = true;
     (async () => {
       try {
         setLoading(true);
         setErr("");
-        const meRes =
-          (await api.get("/auth/me").catch(() => null)) ||
-          (await api.get("/users/me").catch(() => null));
-        if (!active) return;
-        if (meRes?.data) setUser(meRes.data);
-        else setErr("Could not load profile");
+
+        // You might need to implement a /me endpoint in your backend
+        // For now, we'll rely on the Redux store having the user data
+        setErr("Please log in to view your profile");
       } catch (e) {
         if (!active) return;
         setErr(e?.response?.data?.message || "Could not load profile");
@@ -60,6 +110,7 @@ export default function Profile() {
         if (active) setLoading(false);
       }
     })();
+
     return () => {
       active = false;
     };
@@ -119,7 +170,7 @@ export default function Profile() {
             </div>
 
             {/* Edit Profile CTA */}
-            <div className="pb-2">
+            <div className="pb-2 flex gap-2">
               <button
                 onClick={() => navigate("/profile/edit")}
                 className="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 px-3 py-2 text-sm hover:bg-slate-900/60"
@@ -127,6 +178,14 @@ export default function Profile() {
               >
                 <Pencil className="h-4 w-4" />
                 Edit Profile
+              </button>
+              <button
+                onClick={fetchUserData}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-700/60 px-3 py-2 text-sm hover:bg-slate-900/60"
+                aria-label="Refresh profile"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
               </button>
             </div>
           </div>
@@ -249,16 +308,16 @@ export default function Profile() {
             {prefBlocks.some(
               (b) => Array.isArray(prefs[b.key]) && prefs[b.key].length > 0
             ) && (
-              <Section title="Preferences">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {prefBlocks.map(({ label, key }) =>
-                    Array.isArray(prefs[key]) && prefs[key].length > 0 ? (
-                      <BlockList key={key} label={label} items={prefs[key]} />
-                    ) : null
-                  )}
-                </div>
-              </Section>
-            )}
+                <Section title="Preferences">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {prefBlocks.map(({ label, key }) =>
+                      Array.isArray(prefs[key]) && prefs[key].length > 0 ? (
+                        <BlockList key={key} label={label} items={prefs[key]} />
+                      ) : null
+                    )}
+                  </div>
+                </Section>
+              )}
 
             {/* Links */}
             {(user?.website ||
@@ -267,41 +326,41 @@ export default function Profile() {
               user?.twitter ||
               user?.facebook ||
               user?.github) && (
-              <Section title="Links">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {user?.website && (
-                    <LinkRow href={user.website} icon={<Globe className="h-4 w-4" />}>
-                      Website
-                    </LinkRow>
-                  )}
-                  {user?.cv && (
-                    <LinkRow href={user.cv} icon={<FileText className="h-4 w-4" />}>
-                      CV / Resume
-                    </LinkRow>
-                  )}
-                  {user?.linkedin && (
-                    <LinkRow href={user.linkedin} icon={<Linkedin className="h-4 w-4" />}>
-                      LinkedIn
-                    </LinkRow>
-                  )}
-                  {user?.twitter && (
-                    <LinkRow href={user.twitter} icon={<Twitter className="h-4 w-4" />}>
-                      Twitter / X
-                    </LinkRow>
-                  )}
-                  {user?.facebook && (
-                    <LinkRow href={user.facebook} icon={<Facebook className="h-4 w-4" />}>
-                      Facebook
-                    </LinkRow>
-                  )}
-                  {user?.github && (
-                    <LinkRow href={user.github} icon={<Github className="h-4 w-4" />}>
-                      GitHub
-                    </LinkRow>
-                  )}
-                </div>
-              </Section>
-            )}
+                <Section title="Links">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {user?.website && (
+                      <LinkRow href={user.website} icon={<Globe className="h-4 w-4" />}>
+                        Website
+                      </LinkRow>
+                    )}
+                    {user?.cv && (
+                      <LinkRow href={user.cv} icon={<FileText className="h-4 w-4" />}>
+                        CV / Resume
+                      </LinkRow>
+                    )}
+                    {user?.linkedin && (
+                      <LinkRow href={user.linkedin} icon={<Linkedin className="h-4 w-4" />}>
+                        LinkedIn
+                      </LinkRow>
+                    )}
+                    {user?.twitter && (
+                      <LinkRow href={user.twitter} icon={<Twitter className="h-4 w-4" />}>
+                        Twitter / X
+                      </LinkRow>
+                    )}
+                    {user?.facebook && (
+                      <LinkRow href={user.facebook} icon={<Facebook className="h-4 w-4" />}>
+                        Facebook
+                      </LinkRow>
+                    )}
+                    {user?.github && (
+                      <LinkRow href={user.github} icon={<Github className="h-4 w-4" />}>
+                        GitHub
+                      </LinkRow>
+                    )}
+                  </div>
+                </Section>
+              )}
           </div>
         </div>
       </div>
