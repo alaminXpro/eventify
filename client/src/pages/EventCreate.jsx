@@ -16,11 +16,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-/** If you expose SKILLS_ENUM to the client, import it and                  {clubs.map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}ace this. */
 const SKILLS_ENUM_FALLBACK = [
   // Technical
   "Programming",
