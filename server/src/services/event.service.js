@@ -20,10 +20,42 @@ const ApiError = require('../utils/ApiError');
  * @param {Object} eventBody
  * @returns {Promise<Event>}
  */
+// const createEvent = async (eventBody) => {
+//   if (await Event.isEventExists(eventBody.title)) {
+//     throw new ApiError(httpStatus.BAD_REQUEST, 'Event title already exists');
+//   }
+//   return Event.create(eventBody);
+// };
+function parseTimeRange(timeRange) {
+  const [start, end] = timeRange.split('-').map(t => t.trim());
+  return { start, end };
+}
 const createEvent = async (eventBody) => {
+
   if (await Event.isEventExists(eventBody.title)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Event title already exists');
   }
+
+
+  const { start: newStart, end: newEnd } = parseTimeRange(eventBody.event_time_duration);
+
+
+  const conflictEvent = await Event.findOne({
+    location: eventBody.location,
+    event_date: eventBody.event_date,
+  });
+
+  if (conflictEvent) {
+    const { start: existingStart, end: existingEnd } = parseTimeRange(conflictEvent.event_time_duration);
+
+    if (newStart < existingEnd && newEnd > existingStart) {
+      throw new ApiError(
+        httpStatus.BAD_REQUEST,
+        `Another event is already scheduled at ${eventBody.location} (${conflictEvent.event_time_duration})`
+      );
+    }
+  }
+
   return Event.create(eventBody);
 };
 
