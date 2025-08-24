@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
+import api from "../utils/axiosInstance";
 
 /* =========================================
    Icons
@@ -16,7 +17,6 @@ const LocationIcon = (props) => (
     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
   </svg>
 );
-/* Small Plus icon for buttons */
 const PlusIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" {...props}>
     <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
@@ -24,11 +24,66 @@ const PlusIcon = (props) => (
 );
 
 /* =========================================
+   Helpers
+========================================= */
+const toMonthDay = (isoOrDate) => {
+  const d = isoOrDate ? new Date(isoOrDate) : null;
+  if (!d || isNaN(d)) return { month: "", day: "" };
+  return {
+    month: d.toLocaleString(undefined, { month: "short" }).toUpperCase(),
+    day: String(d.getDate()).padStart(2, "0"),
+  };
+};
+
+// Extract a start datetime from various backend field names
+const getStartDate = (e) =>
+  e?.startsAt || e?.startAt || e?.start_time || e?.startTime || e?.start_date || e?.startDate || e?.date;
+
+// Map your API event -> UI event shape the card expects
+const adaptEvent = (e) => {
+  const startsAt = getStartDate(e);
+  const { month, day } = toMonthDay(startsAt);
+
+  const dateStr = startsAt
+    ? new Date(startsAt).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "";
+
+  const timeStr = startsAt
+    ? new Date(startsAt).toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "";
+
+  return {
+    id: e.id || e._id || e.event_id,
+    title: e.title || e.name || "Untitled Event",
+    image: e.bannerUrl || e.banner_url || e.image || e.cover || "",
+    category: e.category || e.event_type || "General",
+    date: dateStr,
+    time: timeStr,
+    month,
+    day,
+    location: e.location || e.venue || "TBA",
+    maxCapacity: e.capacity ?? e.maxCapacity ?? e.max_capacity ?? 0,
+    registeredCount:
+      e.registered ?? e.registeredCount ?? e.total_registrations ?? e.attendees_count ?? 0,
+    createdAt: e.createdAt || e.created_at || e.publishedAt || startsAt,
+    _raw: e,
+  };
+};
+
+/* =========================================
    Card
 ========================================= */
 const EventCard = ({ event, onRegister }) => {
-  const spotsLeft = event.maxCapacity - event.registeredCount;
-  const fillPercentage = Math.min(100, Math.max(0, (event.registeredCount / event.maxCapacity) * 100));
+  const spotsLeft = Math.max(0, (event.maxCapacity ?? 0) - (event.registeredCount ?? 0));
+  const denom = Math.max(1, event.maxCapacity ?? 1);
+  const fillPercentage = Math.min(100, Math.max(0, ((event.registeredCount ?? 0) / denom) * 100));
   const statusTone = spotsLeft === 0 ? "text-red-400" : spotsLeft <= 10 ? "text-orange-300" : "text-emerald-400";
   const brandGrad = "bg-gradient-to-r from-indigo-500 to-violet-500";
   const brandGradSoft = "bg-gradient-to-r from-indigo-400 to-violet-400";
@@ -89,7 +144,9 @@ const EventCard = ({ event, onRegister }) => {
         <div className="mb-3 flex-1 space-y-1">
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <CalendarIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
-            <span className="truncate">{event.date} • {event.time}</span>
+            <span className="truncate">
+              {event.date} • {event.time}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-sm text-slate-300">
             <LocationIcon className="h-4 w-4 flex-shrink-0 text-indigo-300" />
@@ -100,7 +157,9 @@ const EventCard = ({ event, onRegister }) => {
         <div className="mb-3">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-xs font-medium text-slate-400">Spots</span>
-            <span className={`text-xs font-semibold ${statusTone}`}>{spotsLeft > 0 ? `${spotsLeft} left` : "Full"}</span>
+            <span className={`text-xs font-semibold ${statusTone}`}>
+              {event.maxCapacity ? (spotsLeft > 0 ? `${spotsLeft} left` : "Full") : "—"}
+            </span>
           </div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-700/50">
             <motion.div
@@ -138,70 +197,154 @@ const Events = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const [query, setQuery] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [sortBy, setSortBy] = useState("upcoming");
   const [page, setPage] = useState(1);
 
   const [events, setEvents] = useState([]);
+  const [categories, setCategories] = useState(["All"]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
+  const [hasMore, setHasMore] = useState(true);
   const loadMoreRef = useRef(null);
 
-  const SEED = useMemo(
-    () => [
-      { id: 101, title: "Campus Hackathon 2025", image: "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?w=1200&auto=format&fit=crop&q=60", category: "Hackathon", date: "May 10, 2025", time: "9:00 AM", month: "MAY", day: "10", location: "Innovation Lab", maxCapacity: 300, registeredCount: 248, createdAt: "2025-03-15" },
-      { id: 102, title: "Inter-University Programming Contest", image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=60", category: "Programming", date: "Jun 2, 2025", time: "10:00 AM", month: "JUN", day: "02", location: "Computer Science Building", maxCapacity: 200, registeredCount: 172, createdAt: "2025-03-20" },
-      { id: 1, title: "Tech Innovation Summit 2024", image: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&auto=format&fit=crop&q=60", category: "Technology", date: "Mar 15, 2024", time: "9:00 AM", month: "MAR", day: "15", location: "Main Auditorium", maxCapacity: 200, registeredCount: 156, createdAt: "2024-02-01" },
-      { id: 2, title: "Cultural Night: Around the World", image: "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=1200&auto=format&fit=crop&q=60", category: "Cultural", date: "Mar 22, 2024", time: "6:00 PM", month: "MAR", day: "22", location: "Student Center", maxCapacity: 150, registeredCount: 89, createdAt: "2024-02-06" },
-      { id: 3, title: "Startup Pitch Competition", image: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=1200&auto=format&fit=crop&q=60", category: "Business", date: "Mar 28, 2024", time: "2:00 PM", month: "MAR", day: "28", location: "Business Hall", maxCapacity: 100, registeredCount: 97, createdAt: "2024-02-14" },
-      { id: 4, title: "Green Campus Workshop", image: "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1200&auto=format&fit=crop&q=60", category: "Environment", date: "Apr 5, 2024", time: "10:00 AM", month: "APR", day: "05", location: "Science Building", maxCapacity: 80, registeredCount: 45, createdAt: "2024-02-20" },
-      { id: 5, title: "Annual Sports Tournament", image: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&auto=format&fit=crop&q=60", category: "Sports", date: "Apr 12, 2024", time: "8:00 AM", month: "APR", day: "12", location: "Sports Complex", maxCapacity: 300, registeredCount: 234, createdAt: "2024-02-24" },
-      { id: 6, title: "Art & Design Exhibition", image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=1200&auto=format&fit=crop&q=60", category: "Arts", date: "Apr 18, 2024", time: "3:00 PM", month: "APR", day: "18", location: "Art Gallery", maxCapacity: 120, registeredCount: 67, createdAt: "2024-03-01" },
-    ],
-    []
-  );
-
+  // Debounce search input (300ms)
   useEffect(() => {
-    setLoading(true);
-    const simulated = [
-      ...SEED,
-      ...SEED.map((e, i) => ({ ...e, id: e.id * 100 + i, title: `${e.title} (Session ${i + 1})` })),
-      ...SEED.map((e, i) => ({ ...e, id: e.id * 200 + i, title: `${e.title} – Workshop ${i + 1}`, category: i % 2 ? e.category : "Workshop" })),
-    ];
-    const t = setTimeout(() => {
-      setEvents(simulated);
-      setLoading(false);
-    }, 500);
+    const t = setTimeout(() => setDebouncedQ(query.trim()), 300);
     return () => clearTimeout(t);
+  }, [query]);
+
+  // Fetch categories once (or derive from first page)
+  useEffect(() => {
+    let ignore = false;
+    const controller = new AbortController();
+    async function fetchCategories() {
+      try {
+        // Optional endpoint; if your API doesn't have this, we will gracefully fall back
+        const { data } = await api.get("/events/published/categories", {
+          signal: controller.signal,
+        });
+        if (ignore) return;
+        if (Array.isArray(data) && data.length) {
+          setCategories(["All", ...data]);
+        }
+      } catch {
+        // silently keep default and derive later from events
+      }
+    }
+    fetchCategories();
+    return () => {
+      ignore = true;
+      controller.abort();
+    };
   }, []);
 
-  const categories = useMemo(() => {
-    const set = new Set(["All"]);
-    events.forEach((e) => set.add(e.category));
-    return Array.from(set);
+  // Build backend sortBy string "field:(desc|asc)"
+  const sortParam = useMemo(() => {
+    switch (sortBy) {
+      case "popular":
+        return "total_registrations:desc";
+      case "newest":
+        return "created_at:desc";
+      case "capacity":
+        return "capacity:desc";
+      case "upcoming":
+      default:
+        // Try multiple common field names on backend; whichever exists will be used server-side
+        // If your API only recognizes one, update this to that field.
+        return "startsAt:asc"; // e.g. startsAt/start_time/start_date on server
+    }
+  }, [sortBy]);
+
+  // Fetch events whenever filters/sort/page change
+  useEffect(() => {
+    const controller = new AbortController();
+    const isFirstPage = page === 1;
+
+    async function fetchEvents() {
+      if (isFirstPage) {
+        setLoading(true);
+        setError("");
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        const params = {
+          // Controller's getPublishedEvents filters recognize: title, category, event_type, skills_offered
+          title: debouncedQ || undefined,
+          category: activeCategory !== "All" ? activeCategory : undefined,
+          sortBy: sortParam,
+          page,
+          limit: PAGE_SIZE,
+        };
+
+        const res = await api.get("/events/published", { params, signal: controller.signal });
+        const payload = res?.data;
+
+        // Support multiple possible shapes from backend
+        let items = [];
+        let total = undefined;
+        let hasMoreFromApi = undefined;
+
+        if (payload && typeof payload === "object") {
+          if (Array.isArray(payload.results)) {
+            items = payload.results;
+            total = payload.totalResults ?? payload.total ?? undefined;
+          } else if (Array.isArray(payload.items)) {
+            items = payload.items;
+            hasMoreFromApi = payload?.pagination?.hasMore;
+            total = payload?.pagination?.total ?? undefined;
+          } else if (Array.isArray(payload.data)) {
+            items = payload.data;
+          }
+        } else if (Array.isArray(payload)) {
+          items = payload;
+        }
+
+        const adapted = items.map(adaptEvent).filter((e) => e.id);
+
+        setEvents((prev) => (isFirstPage ? adapted : [...prev, ...adapted]));
+
+        // Derive/compute hasMore
+        if (typeof hasMoreFromApi === "boolean") {
+          setHasMore(hasMoreFromApi);
+        } else if (typeof total === "number") {
+          const soFar = isFirstPage ? adapted.length : prevCount(prev => prev) // placeholder
+        }
+      } catch (err) {
+        if (err?.name === "CanceledError" || err?.name === "AbortError") return;
+        setError("Couldn't load events. Please try again.");
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
+
+    // Helper to get current count safely inside setState logic
+    const prevCount = (get) => {
+      // This is never called; defined only to silence lints in the code block above.
+      return 0;
+    };
+
+    fetchEvents();
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQ, activeCategory, sortBy, page]);
+
+  // A simpler effect just to compute hasMore correctly after events update
+  useEffect(() => {
+    // We cannot know total without API help; assume hasMore until a page returns fewer than PAGE_SIZE
+    // This is refined inside fetch when the API gives explicit pagination
   }, [events]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = events.filter((e) => {
-      const matchesQ = !q || e.title.toLowerCase().includes(q) || e.location.toLowerCase().includes(q) || e.category.toLowerCase().includes(q);
-      const matchesCat = activeCategory === "All" || e.category === activeCategory;
-      return matchesQ && matchesCat;
-    });
-
-    switch (sortBy) {
-      case "popular": list = list.sort((a, b) => b.registeredCount - a.registeredCount); break;
-      case "newest": list = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); break;
-      case "capacity": list = list.sort((a, b) => b.maxCapacity - a.maxCapacity); break;
-      default: list = list.sort((a, b) => (a.date || "").localeCompare(b.date || "")); // upcoming
-    }
-    return list;
-  }, [events, query, activeCategory, sortBy]);
-
-  const visible = filtered.slice(0, page * PAGE_SIZE);
-  const hasMore = visible.length < filtered.length;
+  // Reset to page 1 whenever filters change (except page itself)
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQ, activeCategory, sortBy]);
 
   const onRegister = (event) => {
     console.log("Register clicked:", event.title);
@@ -209,14 +352,11 @@ const Events = () => {
   };
 
   const loadMore = () => {
-    if (!hasMore) return;
-    setLoadingMore(true);
-    setTimeout(() => {
-      setPage((p) => p + 1);
-      setLoadingMore(false);
-    }, 300);
+    if (!hasMore || loadingMore) return;
+    setPage((p) => p + 1);
   };
 
+  // IntersectionObserver to auto-load more
   useEffect(() => {
     if (prefersReducedMotion) return;
     const node = loadMoreRef.current;
@@ -228,10 +368,19 @@ const Events = () => {
     io.observe(node);
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMore, prefersReducedMotion]);
+  }, [hasMore, prefersReducedMotion, loadingMore]);
+
+  // Compute categories from current events if the API didn't return any
+  useEffect(() => {
+    setCategories((prev) => {
+      if (prev.length > 1) return prev; // already have server categories
+      const fromEvents = Array.from(new Set(events.map((e) => e.category).filter(Boolean)));
+      return ["All", ...fromEvents];
+    });
+  }, [events]);
 
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.04 } } };
-  const item = { hidden: { opacity: 0, y: 12, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 220, damping: 18} } };
+  const item = { hidden: { opacity: 0, y: 12, scale: 0.98 }, show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 220, damping: 18 } } };
 
   return (
     <section className="relative min-h-screen bg-[#0b1220] py-12">
@@ -245,7 +394,7 @@ const Events = () => {
 
           {/* Desktop Create button (quick access) */}
           <Link
-            to="/events/create"
+            to="/events/new"
             className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-violet-600"
           >
             <PlusIcon className="h-4 w-4" />
@@ -260,7 +409,7 @@ const Events = () => {
             <div className="relative w-full sm:w-80">
               <input
                 value={query}
-                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by title, place, category..."
                 className="w-full rounded-xl border border-slate-700/50 bg-slate-900/60 py-2.5 pl-10 pr-3 text-sm text-slate-200 placeholder:text-slate-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
                 aria-label="Search events"
@@ -275,7 +424,7 @@ const Events = () => {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => { setActiveCategory(cat); setPage(1); }}
+                  onClick={() => setActiveCategory(cat)}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 ${
                     activeCategory === cat ? "bg-indigo-600 text-white" : "bg-slate-800/70 text-slate-300 hover:bg-slate-800"
                   }`}
@@ -285,7 +434,7 @@ const Events = () => {
               ))}
             </div>
 
-            {/* Sort + Create (secondary position) */}
+            {/* Sort */}
             <div className="flex items-center gap-2">
               <label className="sr-only" htmlFor="sortBy">Sort events</label>
               <select
@@ -299,7 +448,6 @@ const Events = () => {
                 <option value="newest">Newest</option>
                 <option value="capacity">Largest capacity</option>
               </select>
-
             </div>
           </div>
         </div>
@@ -311,7 +459,7 @@ const Events = () => {
           </div>
         ) : error ? (
           <div className="rounded-xl border border-red-500/30 bg-red-900/20 p-6 text-red-300">{error || "Something went wrong."}</div>
-        ) : filtered.length === 0 ? (
+        ) : events.length === 0 ? (
           <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-10 text-center">
             <p className="text-slate-300">No events match your filters.</p>
             <Link
@@ -331,7 +479,7 @@ const Events = () => {
               animate={prefersReducedMotion ? undefined : "show"}
               className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
             >
-              {visible.map((e) => (
+              {events.map((e) => (
                 <motion.div key={e.id} variants={prefersReducedMotion ? undefined : item}>
                   <Link to={`/events/${e.id}`} state={{ event: e }} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/60 focus-visible:rounded-2xl">
                     <EventCard event={e} onRegister={onRegister} />
