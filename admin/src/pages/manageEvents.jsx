@@ -23,11 +23,9 @@ const Events = () => {
 
   const fetchEvents = async () => {
     try {
-      // Fetch published events
       const publishedRes = await api.get(`/events/published?limit=${limit}&page=${page}`);
       setPublishedEvents(publishedRes.data.results || []);
 
-      // Fetch unpublished events explicitly
       const unpublishedRes = await api.get(`/events?limit=${limit}&page=${page}&event_status=unpublished`);
       setUnpublishedEvents(unpublishedRes.data.results || []);
     } catch (error) {
@@ -37,7 +35,6 @@ const Events = () => {
       setIsLoading(false);
     }
   };
-
 
   const handleDeleteEvent = async (eventId) => {
     try {
@@ -53,28 +50,15 @@ const Events = () => {
   const handleApproveEvent = async (eventId) => {
     try {
       await api.patch(`/events/${eventId}/status`, { event_status: 'published' });
-
-      // Remove approved event from unpublishedEvents
       setUnpublishedEvents(prev => prev.filter(e => e.id !== eventId));
-
-      // Fetch the updated event details
       const { data } = await api.get(`/events/${eventId}`);
-
-      // Add to publishedEvents only if it's not already there
-      setPublishedEvents(prev => {
-        const exists = prev.some(e => e.id === data.id);
-        if (exists) return prev;
-        return [data, ...prev];
-      });
-
+      setPublishedEvents(prev => prev.some(e => e.id === data.id) ? prev : [data, ...prev]);
       Swal.fire('Approved!', 'Event has been approved.', 'success');
     } catch (error) {
       console.error('Error approving event:', error);
       Swal.fire('Error', 'Failed to approve event.', 'error');
     }
   };
-
-
 
   const showAlert = async (type, eventId) => {
     if (type === 'delete') {
@@ -85,15 +69,35 @@ const Events = () => {
         showCancelButton: true,
         confirmButtonText: 'Delete',
       });
-
-      if (result.isConfirmed) {
-        await handleDeleteEvent(eventId);
-      }
+      if (result.isConfirmed) await handleDeleteEvent(eventId);
     }
   };
 
+  const Card = ({ event, isUnpublished }) => (
+    <div className="relative rounded-xl overflow-hidden shadow-lg hover:shadow-2xl transition duration-300 bg-gradient-to-b from-gray-800 via-gray-900 to-black">
+      <Link to={`/events/${event.id}`} className="block">
+        {event.event_image && (
+          <div className="h-48 w-full relative overflow-hidden">
+            <img src={event.event_image} alt={event.title} className="w-full h-full object-cover transform hover:scale-105 transition duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+          </div>
+        )}
+        <div className="p-4">
+          <h5 className="text-xl font-bold text-white mb-2">{event.title}</h5>
+          <p className="text-gray-300 text-sm line-clamp-2">{event.description || 'No description'}</p>
+        </div>
+      </Link>
+      {isUnpublished && (
+        <div className="flex justify-between p-3 border-t border-gray-700 bg-gray-900">
+          <button onClick={() => handleApproveEvent(event.id)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition">Approve</button>
+          <button onClick={() => showAlert('delete', event.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition">Delete</button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="mb-5">
         <ol className="flex text-primary font-semibold dark:text-white-dark">
           <li className="bg-[#ebedf2] ltr:rounded-l-md rtl:rounded-r-md dark:bg-[#1b2e4b]">
@@ -111,75 +115,33 @@ const Events = () => {
         </div>
       ) : (
         <>
-          {/* Unpublished Events */}
           {unpublishedEvents.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-semibold mb-3">Pending Approval</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {unpublishedEvents.map(event => (
-                  <div key={event.id} className="relative bg-white shadow-md rounded p-5 dark:bg-[#191e3a]">
-                    <h5 className="text-lg font-semibold mb-2 dark:text-white-light">{event.title}</h5>
-                    <p className="mb-2 dark:text-[#9CA3AF]">{event.description || 'No description'}</p>
-                    <div className="flex space-x-2 rtl:space-x-reverse mt-2">
-                      <button
-                        onClick={() => handleApproveEvent(event.id)}
-                        className="btn btn-success btn-sm"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => showAlert('delete', event.id)}
-                        className="btn btn-danger btn-sm"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {unpublishedEvents.map(event => <Card key={event.id} event={event} isUnpublished />)}
               </div>
             </div>
           )}
 
-          {/* Published Events */}
           <h3 className="text-lg font-semibold mb-3">Published Events</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {publishedEvents.map(event => (
-              <div key={event.id} className="relative bg-white shadow-md rounded p-5 dark:bg-[#191e3a]">
-                <div className="dropdown absolute top-2 right-2 z-10">
-                  <Dropdown
-                    placement="bottom-end"
-                    btnClassName="btn btn-secondary dropdown-toggle w-auto h-auto px-2 py-1 text-sm flex items-center"
-                    button={<span>Edit</span>}
-                  >
-                    <ul className="!min-w-[120px]">
-                      <li><Link to={`/edit/event/${event.id}`}>Edit</Link></li>
-                      <li><button onClick={() => showAlert('delete', event.id)}>Delete</button></li>
-                    </ul>
-                  </Dropdown>
-                </div>
-                <h5 className="text-lg font-semibold mb-2 dark:text-white-light">{event.title}</h5>
-                <p className="mb-2 dark:text-[#9CA3AF]">{event.description || 'No description'}</p>
-              </div>
-            ))}
+            {publishedEvents.map(event => <Card key={event.id} event={event} />)}
           </div>
 
           {/* Pagination */}
-          <div className="flex justify-center mt-10">
+          <div className="flex justify-center mt-10 space-x-2">
             <button
               disabled={page === 1 || isLoading}
               onClick={() => { setPage(page - 1); setIsLoading(true); }}
-              className="btn btn-sm mr-2"
-            >
-              Prev
-            </button>
+              className="btn btn-sm"
+            >Prev</button>
             <span className="btn btn-sm px-4 py-1">Page {page}</span>
             <button
               disabled={publishedEvents.length < limit || isLoading}
               onClick={() => { setPage(page + 1); setIsLoading(true); }}
-              className="btn btn-sm ml-2"
-            >
-              Next
-            </button>
+              className="btn btn-sm"
+            >Next</button>
           </div>
 
           {/* Limit Selector */}
