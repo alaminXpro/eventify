@@ -5,14 +5,16 @@ import Footer from "./components/Footer";
 
 function Layout({ children }) {
   const location = useLocation();
-
-  // hide navbar/footer on login and signup pages
-  const hideLayout = location.pathname === "/login" || location.pathname === "/register";
+  const hideLayout =
+    location.pathname === "/login" || location.pathname === "/signup";
 
   return (
     <>
       {!hideLayout && <Navbar />}
-      <main>{children}</main>
+      {/* fixed navbar height = 64px (h-16) */}
+      <main className=" bg-[#0b1220] text-slate-100">
+        {children}
+      </main>
       {!hideLayout && <Footer />}
     </>
   );
