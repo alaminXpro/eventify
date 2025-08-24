@@ -21,6 +21,7 @@ const Test = lazy(() => import('../pages/test'));
 const ChangePassword = lazy(() => import('../pages/changePassword'));
 const Profile = lazy(() => import('../pages/profile'));
 const Transactions = lazy(() => import('../pages/transactions'));
+const EventCreate = lazy(() => import('../pages/EventCreate'));
 const routes = [
   // Public routes
   { path: '/login', element: <Login />, layout: 'blank' },
@@ -43,6 +44,7 @@ const routes = [
       { path: '/user/change-password', element: <ChangePassword /> },
       { path: '/profile/:studentId', element: <Profile /> },
       { path: '/transactions/:clubId', element: <Transactions /> },
+      { path: '/events/add', element: <EventCreate /> },
     ],
   },
 

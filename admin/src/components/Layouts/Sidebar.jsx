@@ -242,7 +242,7 @@ const Sidebar = () => {
               </h2>
 
               <li className="menu nav-item">
-                <NavLink to="/event/add" className="group">
+                <NavLink to="/events/add" className="group">
                   <div className="flex items-center">
                     <IconMenuCharts className="group-hover:!text-primary shrink-0" />
                     <span className="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">{t('Add New Event')}</span>
@@ -251,7 +251,7 @@ const Sidebar = () => {
               </li>
 
               <li className="menu nav-item">
-                <NavLink to="/event" className="group">
+                <NavLink to="/events" className="group">
                   <div className="flex items-center">
                     <IconMenuWidgets className="group-hover:!text-primary shrink-0" />
                     <span className="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">{t('Events')}</span>
