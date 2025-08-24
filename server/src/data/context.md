@@ -1,27 +1,31 @@
-## How to Join a Club at Ahsanullah University of Science and Technology (AUST)
+FAQs
 
-Joining a club at AUST is a great way to enhance your university experience, meet new people, and develop new skills. Here’s a basic guide on how to get involved:
+How do I register for an event?
+→ Open the event page and click Quick Register. If you’re not signed in, you’ll be redirected to login. Some events may ask a few questions before confirming.
 
-1. **Explore Available Clubs**
-   AUST has a variety of student clubs and organizations, including cultural, technical, sports, and social service clubs. You can find information about active clubs on the university notice boards, official website, or social media pages.
+Can I cancel my registration?
+→ Yes. Go to Dashboard → My Events, find the event, and click Unregister. You can cancel until the registration deadline.
 
-2. **Attend Club Fairs or Orientation Events**
-   At the beginning of each semester, many clubs organize fairs or introductory sessions. These events are open to all students and provide an opportunity to learn about club activities and membership requirements.
+How do I update my profile?
+→ Head to your Profile and click Edit Profile. Update your info and save.
 
-3. **Contact Club Representatives**
-   Each club has an executive committee or representatives. You can reach out to them directly via email, Facebook groups, or in-person on campus to express your interest in joining.
+Are there any prerequisites for events?
+→ Prerequisites vary by event. Check the event description. If skills are required, they’ll be listed under Skills Offered or Topics.
 
-4. **Fill Out the Membership Form**
-   Most clubs require you to fill out a membership form. This may be available online or in print during club events.
+I didn’t get a confirmation email.
+→ First, check spam/promotions. Then verify your account email in Profile. If it’s still missing after 10 minutes, contact support with the event name.
 
-5. **Participate in Club Activities**
-   After joining, you can take part in regular meetings, workshops, competitions, and other events organized by the club.
+The event is full, what can I do?
+→ If an event is full, the register button is disabled. Keep an eye on the page—spots may open if others cancel before the deadline.
 
-6. **Membership Fees (if any)**
-   Some clubs may require a small membership fee to cover administrative or event costs. Details will be provided by the club.
+How is attendance recorded?
+→ Show your registration at the venue check-in desk. Organizers will mark attendance on site.
 
-**Note:**
-- All AUST students are eligible to join clubs, but some clubs may have specific requirements or selection processes for certain positions.
-- Stay updated with university notices and club announcements for new opportunities.
+How do I join an online event?
+→ For online/hybrid events, the join link appears on the event page and may also be emailed shortly before the event.
 
-For more information, visit the AUST official website or follow the university’s student affairs office on social media.
+How do I give feedback?
+→ After attending, go to Dashboard → My Events and click Give Feedback on the event.
+
+How do I create an event?
+→ Moderators of a club can create events from Events → Create Event. If you need host access, ask your club admin.

@@ -48,7 +48,7 @@ const EventFAQPage = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/faq', { message: question });
+      const response = await api.post('/ai/faq', { message: question });
       const answer = response.data?.data?.answer || "No answer found.";
 
       const newFaq = {

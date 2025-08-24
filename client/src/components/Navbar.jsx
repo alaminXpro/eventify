@@ -155,6 +155,7 @@ export default function Navbar() {
             <>
               <li><NavLink to="/dashboard" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Dashboard</NavLink></li>
               <li><NavLink to="/profile" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>Profile</NavLink></li>
+              <li><NavLink to="/faq" className={({ isActive }) => `${baseLink} ${isActive ? activeLink : ""}`}>FAQ</NavLink></li>
             </>
           )}
         </ul>
